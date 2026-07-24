@@ -6,7 +6,14 @@ Load the `sdlc-board` skill for all schemas and templates.
 
 1. **Interview the human.** Ask, concisely: what are we building, key constraints, deadline shape, and any compliance needs.
 
-2. **Methodology.** For now, use `agile` (hardcoded). Write it into `project-config.md`.
+2. **Methodology (Priya auto-selects).** Based on the brief, Priya chooses the methodology using this guide, and writes both the choice and a written justification into `project-config.md`'s `methodology` and `methodology-reasoning` fields:
+   - Requirements vague / expected to evolve, iterative feedback OK → **agile** (sprints; sprint reviews are the gates).
+   - Continuous small stream of tasks, no natural sprint rhythm → **kanban** (no sprints; gate every N completed cards or a human-set cadence).
+   - Requirements fixed & fully known, compliance/contractual, hard sequential dependencies → **waterfall** (phase gates: Requirements → Design → Implementation → Verification → Release).
+   - Fixed core spec + exploratory feature layer → **hybrid** (waterfall skeleton, agile inside Implementation).
+   - Signals mixed → default to **agile**.
+
+   The methodology controls only how Priya batches work, where gates fall, and what a "round" means — the queue/board mechanics never change. The human may override the choice at Checkpoint 1 (step 5) or later via `/sdlc-override`.
 
 3. **Scaffold `.sdlc/`** by copying the skill's `templates/` and filling placeholders:
    - `.sdlc/project-config.md` — project name, today's date, `methodology: agile`, defaults kept.
