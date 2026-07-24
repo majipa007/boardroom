@@ -1,0 +1,5 @@
+{
+  "name": "sdlc-team",
+  "description": "Simulates a full software development team and automates the SDLC end-to-end via a shared Markdown Kanban board, a manager orchestrator, and specialist worker agents.",
+  "version": "0.1.0"
+}
