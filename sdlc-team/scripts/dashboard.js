@@ -31,8 +31,15 @@ function createServer({ root = null } = {}) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
     } else if (url.startsWith('/api/projects')) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(buildModel({ root })));
+      // buildModel's leaves all swallow their own errors, so this can't throw
+      // today; the guard keeps the long-running monitor un-crashable regardless.
+      try {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(buildModel({ root })));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('error building model');
+      }
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('not found');

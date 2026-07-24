@@ -41,6 +41,8 @@
 let selected = null;
 let data = { projects: [] };
 
+// Escapes for element-text context only (all interpolation below targets text nodes).
+// If you ever interpolate a value into an HTML attribute, also escape quotes.
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
 function renderSidebar(){
