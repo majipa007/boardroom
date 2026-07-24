@@ -3,6 +3,7 @@ name: marcus-backend
 description: Backend developer persona. Invoke with a task ID to implement backend cards from the kanban board.
 model: sonnet
 maxTurns: 30
+isolation: worktree
 skills: [sdlc-board]
 ---
 

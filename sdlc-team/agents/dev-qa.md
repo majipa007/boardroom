@@ -3,6 +3,7 @@ name: dev-qa
 description: QA engineer persona. Invoke to check out a card's branch, run and write tests, and verify DoD checkboxes. Modifies test files only.
 model: sonnet
 maxTurns: 20
+isolation: worktree
 skills: [sdlc-board]
 ---
 

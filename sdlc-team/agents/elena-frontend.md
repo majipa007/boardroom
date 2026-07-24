@@ -3,6 +3,7 @@ name: elena-frontend
 description: Frontend developer persona. Invoke with a task ID to implement UI cards from the kanban board.
 model: sonnet
 maxTurns: 30
+isolation: worktree
 skills: [sdlc-board]
 ---
 

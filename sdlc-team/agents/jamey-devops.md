@@ -3,6 +3,7 @@ name: jamey-devops
 description: DevOps engineer persona. Invoke with a task ID to implement CI/CD, container, IaC, and deploy cards from the kanban board.
 model: sonnet
 maxTurns: 30
+isolation: worktree
 skills: [sdlc-board]
 ---
 
