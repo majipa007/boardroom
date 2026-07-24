@@ -20,6 +20,7 @@ Load the `sdlc-board` skill for all schemas and templates.
    - `.sdlc/team.md` — copied verbatim.
    - `.sdlc/kanban.md` — header filled (project name, methodology, `round: 0`), all columns empty.
    - Create empty `.sdlc/inbox/` and `.sdlc/archive/` directories, each with a `.gitkeep`.
+   - Register the project with the dashboard: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/lib/discover.js" --register "$(pwd)"` (appends this project's absolute path to `~/.sdlc-team/projects.json`; idempotent — safe to run again). If Node.js is unavailable, skip this; the dashboard's `--root` scan can still find the project.
 
 4. **Decompose the brief** into an initial backlog: at least 3 well-formed cards under `## Backlog`, each with a full Definition of Done, an assignee chosen by role boundary (see team.md), and `T-###` ids starting at `T-001`. Invoke the `priya-manager` agent to author these cards — she is the only agent permitted to write `kanban.md`.
 

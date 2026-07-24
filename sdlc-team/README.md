@@ -21,6 +21,7 @@ Validate:
 | `/status` | Read-only board summary. |
 | `/standup` | One line per team member. |
 | `/sdlc-override <methodology\|key=value>` | Change methodology or config; Priya restructures and logs the decision. |
+| `/sdlc-dashboard [--port N] [--root DIR]` | Launch a read-only local web dashboard (Node.js ≥ 18) showing every project's board, team, inbox, and archive, newest-active first. |
 
 ## How it works
 
@@ -29,6 +30,10 @@ Validate:
 - **Parallel workers, zero conflicts**: each worker runs in its own git worktree; Priya merges one branch at a time and turns conflicts into fix cards.
 - **Definition of Done** lives on every card as checkboxes, each owned by the responsible role.
 - **Checkpoints** (init approval, sprint/phase gate, high/critical security finding, blocked escalation, round-cap) halt the loop and ask you. A Stop hook prevents the session ending with open cards unless `.sdlc/.awaiting-human` is set.
+
+## Dashboard
+
+Run `/sdlc-dashboard` to launch a zero-dependency local web UI (default `http://localhost:8787`). It monitors every project that has run `/sdlc-init` (tracked in `~/.sdlc-team/projects.json`) plus any found under a `--root` you pass. The page auto-refreshes every few seconds and is strictly read-only. Requires Node.js ≥ 18; no `npm install`.
 
 ## Layout it manages in your project
 
