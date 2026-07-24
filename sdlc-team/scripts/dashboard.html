@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDLC Dashboard</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0f1115; --panel:#191c22; --edge:#2a2f3a; --txt:#e6e6e6; --muted:#9aa4b2; --accent:#5aa9e6; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--txt); display:flex; height:100vh; }
+  aside { width:240px; flex:0 0 240px; border-right:1px solid var(--edge); overflow-y:auto; padding:12px; }
+  aside h1 { font-size:15px; margin:0 0 12px; }
+  .proj { padding:8px 10px; border-radius:8px; cursor:pointer; margin-bottom:4px; border:1px solid transparent; }
+  .proj:hover { background:var(--panel); }
+  .proj.active { background:var(--panel); border-color:var(--accent); }
+  .proj .name { font-weight:600; }
+  .proj .meta { color:var(--muted); font-size:12px; }
+  main { flex:1; overflow-y:auto; padding:20px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; }
+  .panel { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:14px; margin-bottom:16px; }
+  .cols { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  .col h3 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 8px; }
+  .card { background:var(--bg); border:1px solid var(--edge); border-radius:8px; padding:8px; margin-bottom:8px; font-size:13px; }
+  .card .id { color:var(--accent); font-weight:600; }
+  .card .who { color:var(--muted); font-size:12px; }
+  .agents span, .msg { display:block; }
+  .msg { border-bottom:1px solid var(--edge); padding:6px 0; font-size:13px; }
+  .msg .h { color:var(--muted); font-size:12px; }
+  .muted { color:var(--muted); }
+  h2 { margin:0 0 4px; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>SDLC Projects</h1>
+  <div id="projects"></div>
+  <div id="empty" class="muted" style="display:none">No projects found. Run <code>/sdlc-init</code> or launch with <code>--root</code>.</div>
+</aside>
+<main id="main"><p class="muted">Loading…</p></main>
+<script>
+let selected = null;
+let data = { projects: [] };
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function renderSidebar(){
+  const el = document.getElementById('projects');
+  const empty = document.getElementById('empty');
+  el.innerHTML = '';
+  empty.style.display = data.projects.length ? 'none' : 'block';
+  for (const p of data.projects){
+    const d = document.createElement('div');
+    d.className = 'proj' + (p.path === selected ? ' active' : '');
+    d.innerHTML = '<div class="name">'+esc(p.name)+'</div>' +
+      '<div class="meta">'+esc(p.methodology||'—')+' · '+esc(p.phase||'—')+' · r'+esc(p.round)+'</div>';
+    d.onclick = () => { selected = p.path; render(); };
+    el.appendChild(d);
+  }
+}
+
+function cardHtml(c){
+  return '<div class="card"><span class="id">'+esc(c.id)+'</span> '+esc(c.title)+
+    '<div class="who">'+esc(c.assignee||'unassigned')+(c.priority?(' · '+esc(c.priority)):'')+'</div></div>';
+}
+function msgHtml(m){
+  return '<div class="msg"><div class="h">'+esc(m.timestamp)+' · '+esc(m.from)+' · '+esc(m.type)+' · '+esc(m.task)+'</div>'+esc(m.summary)+'</div>';
+}
+
+function renderMain(){
+  const main = document.getElementById('main');
+  const p = data.projects.find(x => x.path === selected) || data.projects[0];
+  if (!p){ main.innerHTML = '<p class="muted">Select a project.</p>'; return; }
+  selected = p.path;
+  const cols = ['Blocked','Backlog','In Progress','Review','Done'];
+  main.innerHTML =
+    '<h2>'+esc(p.name)+'</h2><p class="muted">'+esc(p.path)+'</p>' +
+    '<div class="panel agents"><strong>Team</strong><br>' +
+      p.agents.map(a=>'<span>'+esc(a.name)+' — <span class="muted">'+esc(a.role)+'</span></span>').join('') +
+    '</div>' +
+    '<div class="panel"><strong>Board</strong><div class="cols">' +
+      cols.map(c=>'<div class="col"><h3>'+esc(c)+' ('+(p.board[c]||[]).length+')</h3>'+
+        (p.board[c]||[]).map(cardHtml).join('')+'</div>').join('') +
+    '</div></div>' +
+    '<div class="row">' +
+      '<div class="panel" style="flex:1;min-width:280px"><strong>Inbox ('+p.inbox.length+')</strong>' +
+        (p.inbox.length?p.inbox.map(msgHtml).join(''):'<p class="muted">empty</p>')+'</div>' +
+      '<div class="panel" style="flex:1;min-width:280px"><strong>Archive ('+p.archive.length+')</strong>' +
+        (p.archive.length?p.archive.slice(-20).reverse().map(msgHtml).join(''):'<p class="muted">empty</p>')+'</div>' +
+    '</div>';
+}
+
+function render(){ renderSidebar(); renderMain(); }
+
+async function poll(){
+  try {
+    const r = await fetch('/api/projects');
+    data = await r.json();
+    render();
+  } catch (e) { /* keep last render on transient error */ }
+}
+poll();
+setInterval(poll, 3000);
+</script>
+</body>
+</html>
