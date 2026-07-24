@@ -18,3 +18,5 @@ Repeat until (all cards are in Done) OR (a checkpoint fires) OR (the round cap i
 3. Next round — the manager pass drains the new inbox messages.
 
 Report a one-line progress note after each round.
+
+When you pause because the requested number of rounds (`$1`) has run while cards are still open, write an empty `.sdlc/.awaiting-human` file before ending, so the Stop hook treats this as a legitimate pause rather than an unfinished sprint. The next `/sprint` invocation's manager pass will clear it on resume.
