@@ -74,6 +74,7 @@ function renderMain(){
   const cols = ['Blocked','Backlog','In Progress','Review','Done'];
   main.innerHTML =
     '<h2>'+esc(p.name)+'</h2><p class="muted">'+esc(p.path)+'</p>' +
+    '<p class="muted">'+esc(p.methodology||'—')+' · '+esc(p.phase||'—')+' · round '+esc(p.round)+'</p>' +
     '<div class="panel agents"><strong>Team</strong><br>' +
       p.agents.map(a=>'<span>'+esc(a.name)+' — <span class="muted">'+esc(a.role)+'</span></span>').join('') +
     '</div>' +
