@@ -24,12 +24,13 @@ test('parseArgs reads port and root with defaults', () => {
 
 test('buildModel sorts projects newest-first', () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-'));
+  const reg = path.join(base, 'registry.json');
   const a = makeProject(base, 'alpha');
   const b = makeProject(base, 'beta');
   // make beta newer
   const future = Date.now() / 1000 + 100;
   fs.utimesSync(path.join(b, '.sdlc', 'kanban.md'), future, future);
-  const model = buildModel({ root: base });
+  const model = buildModel({ root: base, registryPath: reg });
   const names = model.projects.map(p => p.name);
   assert.ok(names.includes('alpha') && names.includes('beta'));
   assert.strictEqual(names[0], 'beta'); // newest first
@@ -37,8 +38,9 @@ test('buildModel sorts projects newest-first', () => {
 
 test('GET /api/projects returns the JSON model', async () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-'));
+  const reg = path.join(base, 'registry.json');
   makeProject(base, 'alpha');
-  const server = createServer({ root: base });
+  const server = createServer({ root: base, registryPath: reg });
   await new Promise(res => server.listen(0, res));
   const port = server.address().port;
   try {
@@ -55,9 +57,10 @@ test('GET /api/projects returns the JSON model', async () => {
 
 test('GET /board.json returns the contract payload with a rail', async () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dash2-'));
+  const reg = path.join(base, 'registry.json');
   makeProject(base, 'alpha');
   makeProject(base, 'zulu');
-  const server = createServer({ root: base });
+  const server = createServer({ root: base, registryPath: reg });
   await new Promise(res => server.listen(0, res));
   const port = server.address().port;
   try {
@@ -81,8 +84,9 @@ test('GET /board.json returns the contract payload with a rail', async () => {
 
 test('GET / serves the web page and assets are reachable', async () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dash2-'));
+  const reg = path.join(base, 'registry.json');
   makeProject(base, 'alpha');
-  const server = createServer({ root: base });
+  const server = createServer({ root: base, registryPath: reg });
   await new Promise(res => server.listen(0, res));
   const port = server.address().port;
   try {
@@ -108,8 +112,9 @@ test('GET / serves the web page and assets are reachable', async () => {
 
 test('unknown paths 404 and traversal is refused', async () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dash2-'));
+  const reg = path.join(base, 'registry.json');
   makeProject(base, 'alpha');
-  const server = createServer({ root: base });
+  const server = createServer({ root: base, registryPath: reg });
   await new Promise(res => server.listen(0, res));
   const port = server.address().port;
   try {

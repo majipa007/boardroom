@@ -21,13 +21,13 @@ function parseArgs(argv) {
   return args;
 }
 
-function buildModel({ root = null } = {}) {
-  const dirs = discoverProjects({ root });
+function buildModel({ root = null, registryPath } = {}) {
+  const dirs = discoverProjects({ root, registryPath });
   const projects = dirs.map(parseProject).sort((a, b) => b.lastActivity - a.lastActivity);
   return { generated: Date.now(), projects };
 }
 
-function createServer({ root = null } = {}) {
+function createServer({ root = null, registryPath } = {}) {
   return http.createServer((req, res) => {
     const raw = req.url || '/';
     const [pathname, query = ''] = raw.split('?');
@@ -60,7 +60,7 @@ function createServer({ root = null } = {}) {
     if (pathname === '/board.json') {
       try {
         const selected = new URLSearchParams(query).get('project') || undefined;
-        const dirs = discoverProjects({ root })
+        const dirs = discoverProjects({ root, registryPath })
           .map(d => ({ d, t: parseProject(d).lastActivity }))
           .sort((a, b) => b.t - a.t)
           .map(x => x.d);
@@ -77,7 +77,7 @@ function createServer({ root = null } = {}) {
     if (pathname.startsWith('/api/projects')) {
       try {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(buildModel({ root })));
+        res.end(JSON.stringify(buildModel({ root, registryPath })));
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('error building model');
