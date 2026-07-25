@@ -95,3 +95,115 @@ test('parseProject assembles the full model from a fixture dir', () => {
   assert.strictEqual(model.archive.length, 0);
   assert.ok(model.lastActivity > 0);
 });
+
+const { slugify, parseAgentRef, parseConfig } = require('../lib/parse');
+
+const RICH_KANBAN = `# Kanban — rich
+> methodology: hybrid | phase: Foundation
+> last-updated: 2026-07-25T17:10:00Z | round: 2
+
+## Blocked
+
+### T-006 | Authz middleware
+- assignee: Marcus (backend-developer)
+- priority: high
+- depends-on: [T-002, T-003]
+- question(HUMAN): Redis-backed rate limiting or in-memory for v1?
+- definition-of-done:
+  - [ ] middleware implemented
+  - [ ] tests pass
+
+## Backlog
+
+### T-009 | Plain card
+- assignee: Manager
+- priority: low
+
+## In Progress
+
+## Review
+
+### T-002 | Docker + Prisma
+- assignee: Marcus (backend-developer)
+- reviewer: Sofia (security-reviewer)
+- priority: med
+- branch: sdlc/T-002-docker
+- definition-of-done:
+  - [x] compose up works
+  - [x] schema models domain
+  - [ ] tests written
+
+## Done
+`;
+
+const CONFIG = `# Project Config
+- project: Splitmate
+- methodology: hybrid            # chosen by model
+- parallelism: 3                # max workers per round
+- methodology-reasoning: |
+    multi-line text that is not a simple key
+`;
+
+test('slugify normalizes text to an id', () => {
+  assert.strictEqual(slugify('Backend Developer'), 'backend-developer');
+  assert.strictEqual(slugify('  Dev/QA (QA Engineer) '), 'dev-qa-qa-engineer');
+  assert.strictEqual(slugify('Manager'), 'manager');
+});
+
+test('parseAgentRef splits "Name (id)" and bare names', () => {
+  assert.deepStrictEqual(parseAgentRef('Marcus (backend-developer)'),
+    { name: 'Marcus', id: 'backend-developer' });
+  assert.deepStrictEqual(parseAgentRef('Manager'), { name: 'Manager', id: 'manager' });
+  assert.deepStrictEqual(parseAgentRef(''), { name: '', id: '' });
+});
+
+test('parseConfig reads simple key/value lines and strips comments', () => {
+  const cfg = parseConfig(CONFIG);
+  assert.strictEqual(cfg.project, 'Splitmate');
+  assert.strictEqual(cfg.methodology, 'hybrid');
+  assert.strictEqual(cfg.parallelism, '3');
+  assert.strictEqual(cfg['max-rounds-per-sprint'], undefined);
+});
+
+test('parseKanban extracts DoD counts, deps, branch, reviewer and questions', () => {
+  const { board } = parseKanban(RICH_KANBAN);
+
+  const blocked = board.Blocked[0];
+  assert.strictEqual(blocked.id, 'T-006');
+  assert.strictEqual(blocked.assigneeName, 'Marcus');
+  assert.strictEqual(blocked.assigneeId, 'backend-developer');
+  assert.deepStrictEqual(blocked.dependsOn, ['T-002', 'T-003']);
+  assert.strictEqual(blocked.question, 'Redis-backed rate limiting or in-memory for v1?');
+  assert.strictEqual(blocked.questionFor, 'human');
+  assert.deepStrictEqual(blocked.dod, { done: 0, total: 2 });
+  assert.strictEqual(blocked.reviewer, null);
+  assert.strictEqual(blocked.branch, '');
+
+  const plain = board.Backlog[0];
+  assert.strictEqual(plain.assigneeId, 'manager');
+  assert.deepStrictEqual(plain.dod, { done: 0, total: 0 });
+  assert.deepStrictEqual(plain.dependsOn, []);
+  assert.strictEqual(plain.questionFor, '');
+
+  const review = board.Review[0];
+  assert.deepStrictEqual(review.dod, { done: 2, total: 3 });
+  assert.strictEqual(review.branch, 'sdlc/T-002-docker');
+  assert.deepStrictEqual(review.reviewer, { name: 'Sofia', id: 'security-reviewer' });
+});
+
+test('parseProject exposes config and awaitingHuman', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proj2-'));
+  const sdlc = path.join(dir, '.sdlc');
+  fs.mkdirSync(path.join(sdlc, 'inbox'), { recursive: true });
+  fs.mkdirSync(path.join(sdlc, 'archive'), { recursive: true });
+  fs.writeFileSync(path.join(sdlc, 'kanban.md'), RICH_KANBAN);
+  fs.writeFileSync(path.join(sdlc, 'project-config.md'), CONFIG);
+
+  let model = parseProject(dir);
+  assert.strictEqual(model.config.parallelism, '3');
+  assert.strictEqual(model.awaitingHuman, false);
+
+  fs.writeFileSync(path.join(sdlc, '.awaiting-human'), '');
+  model = parseProject(dir);
+  assert.strictEqual(model.awaitingHuman, true);
+});

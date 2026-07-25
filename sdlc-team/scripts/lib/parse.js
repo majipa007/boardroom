@@ -11,6 +11,37 @@ function readOr(p) {
   try { return fs.readFileSync(p, 'utf8'); } catch { return ''; }
 }
 
+function slugify(text) {
+  return String(text == null ? '' : text)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// "Marcus (backend-developer)" -> {name:'Marcus', id:'backend-developer'}
+// "Manager"                    -> {name:'Manager', id:'manager'}
+function parseAgentRef(text) {
+  const raw = String(text == null ? '' : text).trim();
+  if (!raw) return { name: '', id: '' };
+  const m = raw.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+  if (m) return { name: m[1].trim(), id: slugify(m[2]) };
+  return { name: raw, id: slugify(raw) };
+}
+
+// project-config.md: "- key: value" lines, trailing "# comment" stripped.
+// Multi-line block values (key: |) are skipped — nothing in the contract needs them.
+function parseConfig(text) {
+  const cfg = {};
+  for (const line of String(text || '').split(/\r?\n/)) {
+    const m = line.match(/^-\s*([a-z0-9-]+):\s*(.*)$/i);
+    if (!m) continue;
+    const value = m[2].replace(/\s+#.*$/, '').trim();
+    if (value === '|' || value === '') continue;
+    cfg[m[1]] = value;
+  }
+  return cfg;
+}
+
 // kanban.md -> { header:{methodology,phase,round}, board:{col:[card]} }
 function parseKanban(text) {
   const header = { methodology: '', phase: '', round: 0 };
@@ -18,6 +49,7 @@ function parseKanban(text) {
   for (const c of COLUMNS) board[c] = [];
   let col = null;
   let card = null;
+  let inDod = false;
   for (const line of text.split(/\r?\n/)) {
     let m;
     if ((m = line.match(/^>\s*methodology:\s*(.+?)\s*\|\s*phase:\s*(.+?)\s*$/))) {
@@ -27,15 +59,54 @@ function parseKanban(text) {
       header.round = Number(m[1]); continue;
     }
     if ((m = line.match(/^##\s+(.+?)\s*$/))) {
-      col = board[m[1]] ? m[1] : null; card = null; continue;
+      col = board[m[1]] ? m[1] : null; card = null; inDod = false; continue;
     }
     if ((m = line.match(/^###\s+(T-\d+)\s*\|\s*(.+?)\s*$/))) {
-      card = col ? { id: m[1], title: m[2], assignee: '', priority: '', column: col } : null;
+      card = col ? {
+        id: m[1], title: m[2], assignee: '', priority: '', column: col,
+        assigneeName: '', assigneeId: '', branch: '', reviewer: null,
+        dependsOn: [], question: '', questionFor: '',
+        dod: { done: 0, total: 0 },
+      } : null;
       if (card) board[col].push(card);
+      inDod = false;
       continue;
     }
-    if (card && (m = line.match(/^\s*-\s*assignee:\s*(.+?)\s*$/))) { card.assignee = m[1]; continue; }
-    if (card && (m = line.match(/^\s*-\s*priority:\s*(.+?)\s*$/))) { card.priority = m[1]; continue; }
+    if (card && (m = line.match(/^\s*-\s*assignee:\s*(.+?)\s*$/))) {
+      card.assignee = m[1];
+      const ref = parseAgentRef(m[1]);
+      card.assigneeName = ref.name;
+      card.assigneeId = ref.id;
+      inDod = false;
+      continue;
+    }
+    if (card && (m = line.match(/^\s*-\s*priority:\s*(.+?)\s*$/))) {
+      card.priority = m[1]; inDod = false; continue;
+    }
+    if (card && (m = line.match(/^\s*-\s*branch:\s*(.+?)\s*$/))) {
+      card.branch = m[1]; inDod = false; continue;
+    }
+    if (card && (m = line.match(/^\s*-\s*reviewer:\s*(.+?)\s*$/))) {
+      card.reviewer = parseAgentRef(m[1]); inDod = false; continue;
+    }
+    if (card && (m = line.match(/^\s*-\s*depends-on:\s*\[(.*?)\]\s*$/))) {
+      card.dependsOn = m[1].split(',').map(s => s.trim()).filter(Boolean);
+      inDod = false;
+      continue;
+    }
+    if (card && (m = line.match(/^\s*-\s*question(\(HUMAN\))?:\s*(.+?)\s*$/i))) {
+      card.question = m[2];
+      card.questionFor = m[1] ? 'human' : 'manager';
+      inDod = false;
+      continue;
+    }
+    if (card && /^\s*-\s*definition-of-done:\s*$/.test(line)) { inDod = true; continue; }
+    if (card && inDod && (m = line.match(/^\s*-\s*\[([ xX])\]/))) {
+      card.dod.total++;
+      if (m[1] !== ' ') card.dod.done++;
+      continue;
+    }
+    if (card && /^\s*-\s*[a-z-]+:/i.test(line)) { inDod = false; continue; }
   }
   return { header, board };
 }
@@ -103,7 +174,12 @@ function parseProject(projectDir) {
     board,
     inbox: listMessages(path.join(sdlc, 'inbox')),
     archive: listMessages(path.join(sdlc, 'archive')),
+    config: parseConfig(readOr(path.join(sdlc, 'project-config.md'))),
+    awaitingHuman: fs.existsSync(path.join(sdlc, '.awaiting-human')),
   };
 }
 
-module.exports = { COLUMNS, parseKanban, parseTeam, parseMessage, listMessages, computeLastActivity, parseProject };
+module.exports = {
+  COLUMNS, parseKanban, parseTeam, parseMessage, listMessages, computeLastActivity, parseProject,
+  slugify, parseAgentRef, parseConfig,
+};
