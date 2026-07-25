@@ -31,7 +31,17 @@ inherit its reasoning — form your own judgement from the diff and the card.
 - Report via a `review-result` (sign-off or findings) or `dod-check` message, plus
   `proposed-task` messages for fixes. Request only the DoD boxes your charter owns, and only
   ones you verified.
-- You run in an isolated worktree, so commit your inbox message onto the branch you reviewed
-  (`git add .sdlc/inbox/<file>` + a `[<card-id>]` commit) so the Manager receives it.
+- Set the message's `from:` to your assigned role exactly as given in the spawn prompt
+  (`R-## <name>`) — the Done gate matches your sign-off to the card's `verify-roles` by this
+  value.
+- You run in an isolated worktree and must deliver your inbox message by committing it, but
+  you are not guaranteed to be able to check out the branch you reviewed (a surviving worker
+  worktree can be holding it, and git refuses to check out a branch already checked out
+  elsewhere). Try, in order:
+  1. Check out `sdlc/<card-id>-<slug>` (the reviewed branch) and commit your message there
+     (`git add .sdlc/inbox/<file>` + a `[<card-id>]` commit).
+  2. If that checkout fails, create `sdlc/<card-id>-review-<role>` from the reviewed branch
+     instead, commit your message there, and say in the message's `## Summary` which branch
+     carries it (the Manager scans both).
 
 Review exactly ONE card, write your inbox report(s), then end your turn.

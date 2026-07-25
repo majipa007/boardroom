@@ -5,7 +5,9 @@ argument-hint: "[rounds] [--auto]"
 
 Arguments: an optional round count (e.g. `/sprint 5`) and an optional `--auto` to force
 autopilot for this run. Autopilot is otherwise controlled by `autopilot: on|off` in
-`.sdlc/project-config.md` (default `off`).
+`.sdlc/project-config.md` (default `off`). `[rounds]` is just a user-set bound on how many
+rounds this invocation runs before returning control to you — it is not a sixth hard stop;
+the round-cap hard stop below is the separate, config-driven `max-rounds-per-sprint` limit.
 
 **Normal mode** stops at every checkpoint and asks you. **Autopilot** keeps going, logging
 its decisions, and halts only on a hard stop.
@@ -15,12 +17,14 @@ requested number of rounds has run:
 
 **ROUND n:**
 
-1. **Manager pass (sequential, sole board writer).** Invoke the `manager` agent. It drains the
-   inbox → archive, updates the board, processes Blocked first, checks that every card's
-   `verify-roles` have signed off before allowing Done, merges approved branches (a reported
-   failing test run blocks the merge unconditionally), allocates roles to ready cards
-   (reuse → extend → mint, per its registry rules), and records every auto-decision in the
-   Decision Log.
+1. **Manager pass (sequential, sole board writer).** Invoke the `manager` agent. Tell it in
+   the spawn prompt the effective autopilot state for this run — `on` if `--auto` was passed,
+   otherwise whatever `autopilot:` reads in `project-config.md` — so it knows which of its two
+   checkpoint branches to run. It drains the inbox → archive, updates the board, processes
+   Blocked first, checks that every card's `verify-roles` have signed off before allowing
+   Done, merges approved branches (a reported failing test run blocks the merge
+   unconditionally), allocates roles to ready cards (reuse → extend → mint, per its registry
+   rules), and records every auto-decision in the Decision Log.
 
 2. **Dispatch (parallel).** From `.sdlc/team.md` and the board, collect the ready work: cards
    in Backlog/In Progress whose `depends-on` are all Done, and cards in Review awaiting a
@@ -45,7 +49,10 @@ requested number of rounds has run:
 1. **Init approval** — the initial plan has not been approved yet.
 2. **High/critical security finding** — any `type: escalation` from a `sec-review` role.
 3. **Batched `question(HUMAN)`** — at the end of a round, if `.sdlc/human-queue.md` is
-   non-empty, stop and present every queued item together.
+   non-empty, stop and present every queued item together. The queue is presented once, at
+   this stop; the next manager pass records the human's answers in the Decision Log and
+   deletes the file as its first action, so a resumed run does not immediately re-stop on the
+   same items.
 4. **Round cap** — `max-rounds-per-sprint` (default 20) reached with work still open.
 5. **Completion** — every card is in Done.
 
@@ -81,3 +88,8 @@ In normal (non-autopilot) mode, the gate report is presented and the loop STOPS 
 approval, as before.
 
 Report a one-line progress note after each round.
+
+> Note on provenance: the enablement flag (`autopilot: on|off` / `--auto`) and the
+> `.sdlc/human-queue.md` file are this implementation's invention, not called out verbatim in
+> the original build spec (`docs/spec.md`) — flagged here so a reader can tell spec from
+> invention.

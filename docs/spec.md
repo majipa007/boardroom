@@ -1,5 +1,11 @@
 # project.md — SDLC Automation Plugin for Claude Code
 
+> **Historical document.** This is the original v1 build spec, kept for history. It predates
+> the dynamic-roles/autopilot work: the six-persona table, `assignee:`-based cards, per-persona
+> agent files under `.claude/agents/`, and the "Sofia halts the loop" checkpoint flow are all
+> **superseded**. For current behaviour see `docs/dynamic-roles-spec.md` (roles, registry,
+> autopilot) and `docs/dashboard-ui-spec.md` (dashboard UI).
+
 > **Purpose of this document:** This is the complete build specification for a Claude Code plugin
 > called `sdlc-team`. Hand this file to Claude Code and build the plugin milestone by milestone
 > (see §12 Build Roadmap). Everything needed — architecture, file schemas, agent prompts,

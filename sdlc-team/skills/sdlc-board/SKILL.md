@@ -68,9 +68,13 @@ review role does not exist yet, the Manager mints it.
 
 | The card… | attaches |
 |---|---|
-| touches auth/authz, input parsing, secrets, dependencies, or file/network handling | `sec-review` |
-| produces or changes executable code | `qa-verify` |
-| changes infra or deployment | `infra-review` |
+| touches auth/authz, input parsing, secrets, dependencies, or file/network handling | `R-## sec-review` |
+| produces or changes executable code | `R-## qa-verify` |
+| changes infra or deployment | `R-## infra-review` |
+
+`verify-roles` on a card is written `R-## <name>` (matching the card schema above), never a
+bare name — the `R-##` id is whatever id that role already has in the registry, or the next
+free id assigned when the Manager mints it for this classification.
 
 **A card cannot move to Done until every role in its `verify-roles` has a sign-off message in
 `.sdlc/archive/`.** Sign-off means a `review-result` (or `dod-check` for `qa-verify`) message
@@ -92,7 +96,7 @@ One file per message, named `<ISO-timestamp>_<agent>_<task-id-or-GENERAL>.md`. I
 
 ```markdown
 ---
-from: Marcus
+from: R-01 backend
 task: T-014
 type: status-update        # status-update | dod-check | question | proposed-task | review-result | escalation
 timestamp: 2026-07-24T11:47:00Z
@@ -105,7 +109,7 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 - check DoD box 1 ("Endpoint implemented...")
 
 ## Notes for others
-- note(Elena): response shape for /auth/refresh documented in src/api/types.ts
+- note(R-02 frontend): response shape for /auth/refresh documented in src/api/types.ts
 - note(sec-review): please pay attention to token rotation logic in src/auth/refresh.ts
 
 ## New task proposals
@@ -113,6 +117,9 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 ```
 
 **Inbox rules:**
+- Every message's `from:` MUST be the acting role, written as `R-## <name>` (or `Manager`) —
+  never a person's name. The Done gate matches a card's `verify-roles` against sign-offs by
+  this value, so a message with the wrong `from:` is invisible to that check.
 - Workers **never** edit `kanban.md`. All board changes are *requests* in inbox messages.
 - `proposed-task` messages contain a full draft card; the Manager decides whether it becomes a real card.
 - After processing, the Manager moves the file **unchanged** to `archive/` (`mv`, not rewrite). `archive/` is a replayable project history and MUST be committed.

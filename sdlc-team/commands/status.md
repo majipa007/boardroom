@@ -18,3 +18,7 @@ Otherwise print:
 - Every Blocked card: its id, title, and `question:` line.
 - Anything queued in `.sdlc/human-queue.md` awaiting the next hard stop, or "nothing queued".
 - The last 3 archive entries (filename + the one-line `## Summary`).
+
+If `team.md` still uses the legacy roster format (a markdown table rather than `R-##`
+sections), report the listed members instead of the "Active roles"/"Recent registry changes"
+lines above, and skip the registry- and queue-specific lines entirely.

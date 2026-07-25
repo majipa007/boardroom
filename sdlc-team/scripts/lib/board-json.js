@@ -75,7 +75,7 @@ function buildBoardJson(projectDir) {
     for (const c of p.board[column] || []) {
       // The grouping/colour key is the stable role id when the card uses the registry,
       // otherwise the slugified legacy assignee id — so old boards keep working.
-      const roleKey = c.roleId || c.roleName ? (c.roleId || slugify(c.roleName)) : (c.assigneeId || '');
+      const roleKey = (c.roleId || c.roleName) ? (c.roleId || slugify(c.roleName)) : (c.assigneeId || '');
       cards.push({
         id: c.id,
         title: c.title,

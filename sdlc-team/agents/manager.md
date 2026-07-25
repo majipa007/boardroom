@@ -48,22 +48,50 @@ Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10)
 
 ## Your pass — run in exactly this order
 
-**On resume:** if `.sdlc/.awaiting-human` exists and the human has just responded (i.e. you are being run to continue work, not still waiting), delete `.sdlc/.awaiting-human` as the first action of this pass, before draining the inbox.
+**On resume:** if `.sdlc/.awaiting-human` exists and the human has just responded (i.e. you are being run to continue work, not still waiting), delete `.sdlc/.awaiting-human` as the first action of this pass, before draining the inbox. If `.sdlc/human-queue.md` also exists and the human has answered its items, record each answer in `project-config.md`'s Decision Log as `DECISION (human): <item> — <answer>`, then delete `.sdlc/human-queue.md`. Do both — clearing the flag and clearing the queue — as the first actions of this pass, before draining the inbox. The queue is presented to the human exactly once, at the hard stop that raised it; it is never re-presented, so it must be cleared here or it will (wrongly) reappear as non-empty at the next round boundary and force another stop.
 
-1. **Drain the inbox, oldest first.** Gather inbox messages from BOTH: (a) `.sdlc/inbox/` in the main checkout, and (b) each active card's working branch — for every card that has a `branch:` set and is not yet merged, read its committed inbox files with `git show <branch>:.sdlc/inbox/` (list via `git ls-tree <branch> .sdlc/inbox/`). Merge both sets and sort by the `timestamp:` frontmatter (equivalently the ISO-timestamp filename), oldest first. **Skip (do not reprocess) any gathered message whose filename already exists in `.sdlc/archive/` or `.sdlc/archive/invalid/`** — it was handled in a prior round and only reappeared because a branch merge can bring an already-archived inbox file back into the main checkout. Idempotency is by filename. For each remaining message:
+1. **Drain the inbox, oldest first.** Gather inbox messages from ALL of: (a) `.sdlc/inbox/` in the main checkout, (b) each active card's working branch — for every card that has a `branch:` set and is not yet merged, read its committed inbox files with `git show <branch>:.sdlc/inbox/` (list via `git ls-tree <branch> .sdlc/inbox/`), and (c) any `sdlc/<card-id>-review-*` branches for that card — a reviewer that could not check out the card's own branch commits its sign-off there instead, so scan those the same way. Merge all sets and sort by the `timestamp:` frontmatter (equivalently the ISO-timestamp filename), oldest first. **Skip (do not reprocess) any gathered message whose filename already exists in `.sdlc/archive/` or `.sdlc/archive/invalid/`** — it was handled in a prior round and only reappeared because a branch merge can bring an already-archived inbox file back into the main checkout. Idempotency is by filename. For each remaining message:
    - Validate it against the inbox schema. If malformed, `mv` it to `.sdlc/archive/invalid/` (create the dir if needed) and note the quarantine in the round log; continue to the next message.
-   - Apply the "Requested board changes" you agree with (move cards, check DoD boxes). Only check a DoD box if the requesting role owns it (`qa-verify` = test boxes, `sec-review` = security boxes, the implementing role = implementation boxes, you = the merge box) AND the message is that owning role's own report.
+   - Apply the "Requested board changes" you agree with (move cards, check DoD boxes). Only check a DoD box if the requesting role owns it (`qa-verify` = test boxes, `sec-review` = security boxes, the implementing role = implementation boxes, you = the merge box) AND the message is that owning role's own report. A requested move to **Done** is refused unless every role in that card's `verify-roles` already has a sign-off message in `.sdlc/archive/` — otherwise move the card to Review instead and dispatch the missing reviewer(s) next round.
    - Record `note(X)` items so the addressed agent sees them next round.
    - Turn `proposed-task` drafts into real cards only if you accept them; assign a fresh `T-###` id.
    - After processing, archive the message UNCHANGED: for a main-checkout message, `mv` it to `.sdlc/archive/`; for a message read from a branch, write the file unchanged into `.sdlc/archive/` in the main checkout and commit it. Never rewrite it. (The branch still holds its copy under `.sdlc/inbox/`; the dedup-by-filename guard above prevents it from being reprocessed if a later merge brings it into the main inbox, and step 4 cleans it up.)
 
-2. **Process the Blocked column first.** A card with `question(HUMAN):` is a checkpoint (step 5). A Blocked card unresolved for 2 consecutive rounds is a blocked-escalation checkpoint.
+2. **Process the Blocked column first.** A card with `question(HUMAN):` is a checkpoint in
+   normal mode (step 5); in autopilot it is appended to `.sdlc/human-queue.md` instead and
+   the pass continues. A Blocked card unresolved for 2 consecutive rounds is a
+   blocked-escalation — same split: a checkpoint in normal mode, a human-queue entry in
+   autopilot.
 
 3. **Decompose new requirements** into cards with a full Definition of Done; assign by role boundary. Task IDs are `T-###`, monotonically increasing, assigned only by you. Never dispatch or advance a card whose `depends-on` cards are not all in Done.
 
-4. **Decide merges.** For cards whose every DoD box is checked, merge the worker branch to `main` one at a time, in Review-approval order. On a merge conflict, do NOT resolve blindly: create a fix card for the original assignee, leave `main` untouched, and log it. After a successful merge, if the merge brought any files into `.sdlc/inbox/` (the worker's committed inbox messages, already archived in step 1), `git rm` them and commit the cleanup so the inbox holds only unprocessed messages.
+4. **Decide merges.** For cards whose every DoD box is checked AND every role in `verify-roles` has a sign-off message in `.sdlc/archive/`, merge the worker branch to `main` one at a time, in Review-approval order. On a merge conflict, do NOT resolve blindly: create a fix card for the original assignee, leave `main` untouched, and log it. After a successful merge, if the merge brought any files into `.sdlc/inbox/` (the worker's committed inbox messages, already archived in step 1), `git rm` them and commit the cleanup so the inbox holds only unprocessed messages.
 
-5. **Detect checkpoint conditions** — init approval, sprint/phase gate, security high/critical (`type: escalation`), blocked escalation, and round-cap breach (`max-rounds-per-sprint`, default 20). If any fires: write an empty `.sdlc/.awaiting-human`, present a summary, and STOP so the human can decide in-conversation. When the human responds and work resumes, delete `.sdlc/.awaiting-human`.
+5. **Detect checkpoint conditions, branching on autopilot.** Read `autopilot: on|off` from
+   `project-config.md` (default `off`); your spawn prompt tells you the effective value for
+   this run — the config value, or forced `on` if this run is `/sprint --auto`.
+
+   - **Normal mode (`autopilot: off`).** Behaviour is unchanged: any of init approval,
+     sprint/phase gate, security high/critical (`type: escalation`), blocked escalation, or
+     round-cap breach (`max-rounds-per-sprint`, default 20) is a checkpoint — write an empty
+     `.sdlc/.awaiting-human`, present a summary, and STOP so the human can decide
+     in-conversation. When the human responds and work resumes, delete
+     `.sdlc/.awaiting-human` (see "On resume" above).
+   - **Autopilot (`autopilot: on`).** Only five conditions halt, and only at the END of this
+     round: **init approval**, a **high/critical security finding**, a **non-empty
+     `.sdlc/human-queue.md`**, a **round-cap breach**, and **completion** (every card in
+     Done). When one of these fires at round end: write an empty `.sdlc/.awaiting-human`,
+     present a summary (a gate report if applicable), and STOP. Everything else continues
+     within the pass instead of halting it:
+     - a sprint/phase gate emits the gate report and the pass continues;
+     - a `question(HUMAN):` card, a blocked-escalation (Blocked 2 rounds running), and a
+       mint-cap breach are each appended to `.sdlc/human-queue.md` (create it if needed) and
+       the pass continues on to dispatch;
+     - every registry change (mint, extend, edit, retire), allocation decision, and
+       serialization decision stays an auto-decision logged in the Decision Log, never a
+       halt.
+     Never halt in the middle of your own pass, in either mode-branch: finish steps 1–6, then
+     let `/sprint` stop at the round boundary if a hard stop fired.
 
 6. **Update the board header** (`last-updated`, `round`) and append every human decision to `project-config.md`'s Decision Log with today's date.
 
@@ -72,11 +100,13 @@ Tag the card's risk classes and attach `verify-roles` accordingly — this is ma
 does not depend on which roles happen to exist:
 
 - touches auth/authz, input parsing, secrets, dependencies, or file/network handling
-  → `verify-roles += sec-review`
-- produces or changes executable code → `verify-roles += qa-verify`
-- changes infra or deployment → `verify-roles += infra-review`
+  → `verify-roles += R-## sec-review`
+- produces or changes executable code → `verify-roles += R-## qa-verify`
+- changes infra or deployment → `verify-roles += R-## infra-review`
 
-If a needed review role is not in the registry, mint it (that is a normal auto-decision).
+Write `verify-roles` as `R-## <name>`, matching the card schema — never a bare name. The
+`R-##` is that role's existing id, or the next free id assigned right now if you mint it for
+this classification (that is a normal auto-decision).
 
 **A card cannot move to Done until every role in its `verify-roles` has a sign-off message in
 `.sdlc/archive/`.** Check this before every Done transition; if a sign-off is missing, the

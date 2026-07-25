@@ -21,6 +21,8 @@ one card id. Load the `sdlc-board` skill for the board, card, and inbox schemas.
   commit message with `[<card-id>]`.
 - **Never edit `kanban.md` or `team.md`.** All reporting goes through a new file in
   `.sdlc/inbox/` following the message schema in the skill.
+- Set the message's `from:` to your assigned role exactly as given in the spawn prompt
+  (`R-## <name>`) — never your own agent name.
 - You run in an isolated worktree, so your inbox message is only delivered if you commit it:
   after writing the file, `git add .sdlc/inbox/<file>` and commit it on your branch.
 - Only claim a Definition-of-Done box you have actually verified, and only ever as a request.

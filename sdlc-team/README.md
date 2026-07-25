@@ -88,8 +88,9 @@ the page polls it every 5 seconds and repaints only when the content hash change
 
     .sdlc/
     ├── kanban.md           # THE BOARD (manager only)
-    ├── team.md             # composed roster + role boundaries
+    ├── team.md             # the role registry + role boundaries
     ├── project-config.md   # methodology, checkpoints, decision log
+    ├── human-queue.md      # created on demand: questions batched for the next hard stop
     ├── inbox/              # worker → manager messages
     └── archive/            # processed messages (project history)
 

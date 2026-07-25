@@ -144,7 +144,6 @@ function cardNode(c, byId) {
   a.dataset.status = c.status;
   const roleKey = c.role || c.assignee || '';
   a.dataset.agent = roleKey;                 // CSS colour hook (unchanged attribute name)
-  a.dataset.role = roleKey;
   if (c.priority) a.dataset.priority = c.priority;
   if (c.questionFor) a.dataset.questionFor = c.questionFor;
   const stamp = STAMPS[c.status];
@@ -243,7 +242,7 @@ function openOverlay(c) {
   body.textContent = '';
   body.appendChild(el('h3', null, `${c.id} — ${c.title}`));
   body.appendChild(el('p', null,
-    `status: ${c.status} · assignee: ${c.assigneeName || c.assignee || 'unassigned'}` +
+    `status: ${c.status} · role: ${c.roleName || c.role || 'unassigned'}` +
     `${c.reviewerName ? ' · reviewer: ' + c.reviewerName : ''} · priority: ${c.priority}`));
   if (c.branch) body.appendChild(el('p', null, `branch: ${c.branch}`));
   if (c.dependsOn && c.dependsOn.length) {

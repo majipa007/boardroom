@@ -22,7 +22,7 @@
 
 ## What it is
 
-You describe what you want built. Boardroom stands up a **manager agent** that reads the brief, decides which specialists the job needs, writes those specialists into your project as real agents, and puts the work on a Markdown Kanban board at `.sdlc/kanban.md`.
+You describe what you want built. Boardroom stands up a **manager agent** that reads the brief, decides which specialists the job needs, and keeps them as a **role registry** — spawning a generic `worker` or `reviewer` with that role's charter injected, rather than writing agent files or restarting anything — while it puts the work on a Markdown Kanban board at `.sdlc/kanban.md`.
 
 Then it runs the project. Each round, specialists claim their cards, **write real code in your repository** — each in its own git worktree, so they run in parallel without stepping on each other — and report back. The manager reviews, merges, re-plans, and comes back to you only at checkpoints that matter.
 
@@ -133,7 +133,8 @@ The rules that make it hold together:
 
 ```markdown
 ### T-014 | Implement JWT refresh endpoint
-- assignee: Backend Developer
+- role: R-01 backend
+- verify-roles: [R-04 sec-review, R-05 qa-verify]
 - priority: high
 - depends-on: [T-011]
 - branch: sdlc/T-014-jwt-refresh
@@ -142,8 +143,8 @@ The rules that make it hold together:
     return a new access+refresh pair. Follow the error envelope in src/api/errors.ts.
 - definition-of-done:
   - [ ] Endpoint returns correct status codes (200/401/403)
-  - [ ] Unit + integration tests passing        (QA verifies)
-  - [ ] No new high/critical findings           (Security signs off)
+  - [ ] Unit + integration tests passing        (qa-verify verifies)
+  - [ ] No new high/critical findings           (sec-review signs off)
   - [ ] Branch merges cleanly to main           (Manager verifies)
 - status-log:
   - 2026-07-25T10:02 created
@@ -155,8 +156,9 @@ The rules that make it hold together:
 ```
 .sdlc/
 ├── kanban.md           # THE BOARD — manager writes, everyone reads
-├── team.md             # the composed roster + role boundaries
+├── team.md             # the role registry + role boundaries
 ├── project-config.md   # methodology, checkpoints, decision log
+├── human-queue.md      # created on demand: questions batched for the next hard stop
 ├── inbox/              # worker → manager messages, awaiting processing
 └── archive/            # processed messages, verbatim (project history)
 ```
@@ -211,13 +213,30 @@ The manager picks one from your brief, writes down *why*, and you can override i
 
 Methodology changes how work is batched and where gates fall. The board and queue mechanics never change.
 
-### Checkpoints — where it stops and asks you
+### Checkpoints (normal mode) — where it stops and asks you
 
 1. **Plan approval** — nothing is written until you approve the methodology and backlog.
 2. **Sprint / phase gate** — end of a sprint, phase, or every N cards.
 3. **Security escalation** — any high/critical finding halts the loop immediately.
 4. **Blocked escalation** — a card explicitly asking for you, or blocked two rounds running.
 5. **Round cap** — hits `max-rounds-per-sprint` (default 20) with work still open.
+
+### Hard stops (autopilot) — the only five things that halt it
+
+With `autopilot: on` (or `/sprint --auto`), the five checkpoints above stop being individual
+stops. Only these five halt the loop, and only at a round boundary:
+
+1. **Init approval** — the initial plan has not been approved yet.
+2. **High/critical security finding** — any escalation from a security-review role.
+3. **Batched `question(HUMAN)`** — questions raised mid-round are queued in
+   `.sdlc/human-queue.md` and presented together, once, at the end of the round.
+4. **Round cap** — `max-rounds-per-sprint` (default 20) reached with work still open.
+5. **Completion** — every card is in Done.
+
+A sprint/phase gate and a blocked escalation no longer stop the loop in autopilot — the
+former emits a gate report and continues, the latter is queued like a `question(HUMAN)`.
+Everything else (role mints, charter edits, allocation, serialization, fix cards) is an
+auto-decision logged to the Decision Log.
 
 ---
 
