@@ -31,7 +31,7 @@ const TEAM = `# Team Roster & Role Boundaries
 
 | Name    | Role                   | Writes code? | Scope |
 |---------|------------------------|--------------|-------|
-| Priya   | Manager / Orchestrator | No           | ...   |
+| Manager | Manager / Orchestrator | No           | ...   |
 | Marcus  | Backend Developer      | Yes          | ...   |
 `;
 
@@ -62,7 +62,7 @@ test('parseKanban reads header and places cards by column', () => {
 test('parseTeam skips header/separator and returns members', () => {
   const agents = parseTeam(TEAM);
   assert.deepStrictEqual(agents, [
-    { name: 'Priya', role: 'Manager / Orchestrator' },
+    { name: 'Manager', role: 'Manager / Orchestrator' },
     { name: 'Marcus', role: 'Backend Developer' },
   ]);
 });

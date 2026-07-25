@@ -1,63 +1,48 @@
-![Boardroom](boardroom.png)
+<p align="center">
+  <img src="boardroom.png" alt="Boardroom" width="100%">
+</p>
 
-# Boardroom
+<h1 align="center">Boardroom</h1>
 
-**A Claude Code plugin that runs a full AI software team and automates the SDLC end‑to‑end on a shared Markdown Kanban board.**
+<p align="center">
+  <b>A Claude Code plugin that runs a software team.</b><br>
+  One manager, a roster it builds for your project, and a Kanban board they actually work off.
+</p>
 
-Boardroom hosts the `sdlc-team` plugin. A manager agent decomposes work onto a board, specialist worker agents pick up their cards and **write real code in your repository**, and work runs in rounds until the board is clear — with humans stepping in only at defined checkpoints. A bundled read‑only web dashboard lets you watch every project's board, team, inbox, and archive live.
-
----
-
-## What it does
-
-You give it a project brief. It:
-
-1. **Composes a team and a board.** A project-specific roster — always a manager, security, and QA, plus the specialists your brief needs — each with hard role boundaries, and a Kanban board (`.sdlc/kanban.md`) that is the single source of truth.
-2. **Plans the work.** The manager picks an SDLC methodology (Agile / Kanban / Waterfall / Hybrid) from your brief, decomposes it into cards with a checkbox Definition of Done, and stops for your approval.
-3. **Ships code in rounds.** Each round: the manager updates the board, then specialist agents run **in parallel git worktrees**, each implementing one card and reporting back. The manager reviews, merges, and re‑plans.
-4. **Gates on humans where it matters.** Init approval, sprint/phase gates, high‑severity security findings, blocked cards, and a round cap all halt the loop and ask you.
-
-### The team (composed per project)
-
-Three roles are always present:
-
-| Agent | Role | Writes code? |
-|-------|------|--------------|
-| **Priya** | Manager / Orchestrator | No — sole board writer; also composes the team |
-| **Sofia** | Security | No (v1) — reviews diffs, escalates high/critical |
-| **Dev** | QA | Tests only — verifies DoD, signs off |
-
-Everything else is **composed from your brief**: at `/sdlc-init` Priya picks the implementation specialists the project needs (backend, frontend, mobile, ML, data, infra, docs, …), writes each as an agent into your project's `.claude/agents/`, and records the roster in `.sdlc/team.md`. No fixed developer list.
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#the-team">The team</a> ·
+  <a href="#commands">Commands</a> ·
+  <a href="#dashboard">Dashboard</a>
+</p>
 
 ---
 
-## How it works
+## What it is
 
-- **Board is the single source of truth** (`.sdlc/kanban.md`) — and only the manager writes it.
-- **Workers never touch the board.** They report by dropping files in `.sdlc/inbox/`; the manager processes them oldest‑first and moves them unchanged into `.sdlc/archive/` (a replayable project history).
-- **Parallel workers, zero conflicts.** Each worker runs in its own git worktree on its own branch; the manager merges one branch at a time and turns merge conflicts into fix cards rather than resolving blindly.
-- **Dynamic roster.** Priya composes specialists per project into `.claude/agents/`; a one-time restart after the first `/sdlc-init` loads them (later additions hot-load).
-- **Definition of Done lives on every card** as checkboxes, each owned by the responsible role (Dev checks test boxes, Sofia security boxes, and so on). A card reaches Done only when every box is checked.
-- **A Stop hook** prevents a session from ending while cards are still open — unless the board is legitimately waiting on a human.
+You describe what you want built. Boardroom stands up a **manager agent** that reads the brief, decides which specialists the job needs, writes those specialists into your project as real agents, and puts the work on a Markdown Kanban board at `.sdlc/kanban.md`.
 
-It manages this layout inside your project:
+Then it runs the project. Each round, specialists claim their cards, **write real code in your repository** — each in its own git worktree, so they run in parallel without stepping on each other — and report back. The manager reviews, merges, re-plans, and comes back to you only at checkpoints that matter.
 
-```
-.sdlc/
-├── project-config.md   # methodology, checkpoints, decision log
-├── team.md             # roster + role boundaries
-├── kanban.md           # THE BOARD (manager only)
-├── inbox/              # worker → manager messages
-└── archive/            # processed messages (project history)
-```
+**The board is the product.** It is plain Markdown, committed to your repo, so the entire project history is greppable, diffable, and replayable — no database, no SaaS, no lock-in.
 
-Commit `.sdlc/` — it *is* your project‑management record.
+## Why it's built this way
+
+| Problem with naive multi-agent setups | What Boardroom does |
+|---|---|
+| Agents overwrite each other's files | Every worker runs in its own **git worktree** on its own branch; the manager merges one at a time |
+| Agents overwrite each other's *state* | **Exactly one writer** of the board. Workers can only *request* changes, via a file queue |
+| "Done" means whatever the agent says | **Definition of Done is checkboxes**, and each box is owned by the role responsible for it |
+| Agents drift, invent, and run away | **Human checkpoints** halt the loop: plan approval, phase gates, security escalations, round caps |
+| No idea what happened | Every message is archived verbatim. `archive/` + `git log` reconstructs the whole project |
 
 ---
 
 ## Install
 
-Boardroom is its own plugin marketplace. In Claude Code, run these as **two separate prompts**:
+Boardroom is its own plugin marketplace. In Claude Code, send these as **two separate prompts**:
 
 ```
 /plugin marketplace add majipa007/boardroom
@@ -67,79 +52,215 @@ Boardroom is its own plugin marketplace. In Claude Code, run these as **two sepa
 /plugin install sdlc-team@boardroom
 ```
 
-Then restart Claude Code (or run `/reload-plugins`). The `/sdlc-*` commands become available.
+Restart Claude Code (or `/reload-plugins`) and the `/sdlc-*` commands appear.
 
-### Local / dev install (no marketplace)
-
-Clone the repo and load the plugin for a single session:
+<details>
+<summary><b>Local / dev install</b> (no marketplace)</summary>
 
 ```bash
 git clone git@github.com:majipa007/boardroom.git
 claude --plugin-dir ./boardroom/sdlc-team
 ```
 
-Validate the plugin at any time:
+Validate any time:
 
 ```bash
 claude plugin validate ./sdlc-team --strict
 ```
+</details>
 
-> **Note:** the marketplace is named `boardroom`; the plugin inside it is named `sdlc-team` — hence `sdlc-team@boardroom`. The dashboard command requires **Node.js ≥ 18** (no `npm install`).
+> The marketplace is named `boardroom`; the plugin inside it is `sdlc-team` — hence `sdlc-team@boardroom`.
+> The dashboard needs **Node.js ≥ 18**. Nothing else. No `npm install`, no dependencies.
+
+## Quickstart
+
+From inside the repository you want built:
+
+```
+/sdlc-init
+```
+Answer a few questions about the project. The manager picks a methodology, composes the team, drafts the backlog, and **stops for your approval**. (First run creates `.claude/agents/` — restart Claude Code once so the new specialists load.)
+
+```
+/sprint
+```
+The team works in rounds until the board is clear or something needs you.
+
+```
+/status
+```
+Read-only snapshot, any time.
 
 ---
 
-## Usage
+## How it works
 
-Start in the repository you want to build in:
+```mermaid
+flowchart TD
+    A["/sprint round starts"] --> B["MANAGER PASS<br/>(sole board writer)"]
+    B --> B1["drain inbox oldest-first → archive/"]
+    B1 --> B2["process Blocked column first"]
+    B2 --> B3["merge approved branches<br/>conflict → fix card"]
+    B3 --> B4["assign / re-assign cards"]
+    B4 --> C{"checkpoint<br/>triggered?"}
+    C -->|yes| H["HALT — ask the human"]
+    C -->|no| D["DISPATCH IN PARALLEL<br/>up to N workers"]
+    D --> W1["specialist<br/>own worktree<br/>1 card"]
+    D --> W2["specialist<br/>own worktree<br/>1 card"]
+    D --> W3["reviewer / QA<br/>sign-off"]
+    W1 --> E["commit inbox message<br/>on own branch"]
+    W2 --> E
+    W3 --> E
+    E --> F{"all cards Done?"}
+    F -->|no| A
+    F -->|yes| G["project complete"]
+```
+
+The rules that make it hold together:
+
+- **One writer.** Only the manager edits `.sdlc/kanban.md`. Workers never touch it — they drop a message in `.sdlc/inbox/` requesting a change, and the manager decides.
+- **Messages are the audit log.** The manager processes the inbox oldest-first and moves each file *unchanged* into `.sdlc/archive/`. That archive plus `git log` is a complete, replayable project history.
+- **Parallel, isolated, merged deliberately.** Each worker gets its own git worktree and branch (`sdlc/T-014-jwt-refresh`). The manager merges one branch at a time in approval order; a merge conflict becomes a **fix card**, never a blind resolution.
+- **Done is mechanical.** Every card carries a Definition of Done as checkboxes, and a box may only be checked by the role that owns it — QA owns test boxes, the security reviewer owns security boxes, the implementer owns implementation boxes. A card reaches Done only when every box is checked.
+- **The session can't quietly abandon work.** A Stop hook blocks the session from ending while cards are still open, unless the board is legitimately waiting on you.
+
+### Anatomy of a card
+
+```markdown
+### T-014 | Implement JWT refresh endpoint
+- assignee: Backend Developer
+- priority: high
+- depends-on: [T-011]
+- branch: sdlc/T-014-jwt-refresh
+- what: |
+    Add POST /auth/refresh. Rotate refresh tokens, invalidate the old token,
+    return a new access+refresh pair. Follow the error envelope in src/api/errors.ts.
+- definition-of-done:
+  - [ ] Endpoint returns correct status codes (200/401/403)
+  - [ ] Unit + integration tests passing        (QA verifies)
+  - [ ] No new high/critical findings           (Security signs off)
+  - [ ] Branch merges cleanly to main           (Manager verifies)
+- status-log:
+  - 2026-07-25T10:02 created
+  - 2026-07-25T10:31 started (worktree created)
+```
+
+### What it creates in your project
+
+```
+.sdlc/
+├── kanban.md           # THE BOARD — manager writes, everyone reads
+├── team.md             # the composed roster + role boundaries
+├── project-config.md   # methodology, checkpoints, decision log
+├── inbox/              # worker → manager messages, awaiting processing
+└── archive/            # processed messages, verbatim (project history)
+
+.claude/agents/         # the specialists the manager wrote for this project
+```
+
+Commit `.sdlc/` — it *is* your project-management record.
+
+---
+
+## The team
+
+Three roles are always present, and ship with the plugin:
+
+| Agent | Role | Writes code? | Hard boundary |
+|---|---|---|---|
+| `manager` | Manager / Orchestrator | No | The only writer of the board. Decomposes, assigns, merges, runs checkpoints, composes the team. Never implements features. |
+| `security-reviewer` | Security | No | Reviews branch diffs, rates findings `low`→`critical`, files fixes as proposed tasks. High/critical **halts the loop**. Never fixes code itself. |
+| `qa-engineer` | QA | Tests only | Runs and writes tests, verifies DoD boxes, signs off cards. Never modifies non-test source. |
+
+**Everything else is composed for your project.** There is no fixed developer list. At `/sdlc-init` the manager reads your brief and creates exactly the specialists it needs — writing each one as a real agent file into `.claude/agents/<role>.md`, with its own scope and hard "you do not touch this" boundaries, and recording the roster in `.sdlc/team.md`.
+
+```
+brief: "iOS app, ML recommender, and a REST API behind it"
+
+composed roster:
+  manager · security-reviewer · qa-engineer     (always)
+  ios-developer                                 ← invented for this project
+  ml-engineer                                   ←
+  backend-developer                             ←
+```
+
+A brief with no UI gets no frontend role. A data pipeline project gets a data engineer. If a card later needs a specialist that doesn't exist yet, the manager creates that role mid-project (hot-loaded, no restart).
+
+---
+
+## Commands
 
 | Command | What it does |
-|---------|--------------|
-| `/sdlc-init` | Interview you, auto‑select a methodology, scaffold `.sdlc/`, decompose the brief into a backlog, and stop for approval. |
-| `/sprint [rounds]` | Run the loop: manager pass → parallel worker dispatch → repeat, until the board is clear or a checkpoint fires. Optional arg caps the rounds. |
-| `/status` | Read‑only board summary. |
-| `/standup` | One line per team member. |
+|---|---|
+| `/sdlc-init` | Interview you, pick a methodology, compose the team, scaffold `.sdlc/`, draft the backlog, stop for approval. |
+| `/sprint [rounds]` | Run the loop: manager pass → parallel dispatch → repeat, until the board is clear or a checkpoint fires. Optional arg caps the rounds. |
+| `/status` | Read-only board summary: column counts, blocked cards, current phase, recent history. |
+| `/standup` | One line per team member — what they finished, what they're starting. |
 | `/sdlc-override <methodology\|key=value>` | Change methodology or config; the manager restructures the board and logs the decision. |
-| `/sdlc-dashboard [--port N] [--root DIR]` | Launch the read‑only local web dashboard. |
+| `/sdlc-dashboard [--port N] [--root DIR]` | Launch the local web dashboard. |
 
-Typical flow:
+### Methodology
 
-```
-/sdlc-init          # describe what to build, approve the plan
-/sprint             # let the team work in rounds until it needs you
-/status             # check in anytime
-```
+The manager picks one from your brief, writes down *why*, and you can override it at the approval checkpoint or later with `/sdlc-override`:
+
+| Your brief looks like | It picks |
+|---|---|
+| Requirements vague, expected to evolve | **Agile** — sprints, sprint reviews as gates |
+| Steady stream of small tasks, no sprint rhythm | **Kanban** — no sprints, gate every N cards |
+| Requirements fixed, compliance, hard sequencing | **Waterfall** — phase gates |
+| Fixed core + exploratory layer | **Hybrid** — waterfall skeleton, agile inside implementation |
+
+Methodology changes how work is batched and where gates fall. The board and queue mechanics never change.
+
+### Checkpoints — where it stops and asks you
+
+1. **Plan approval** — nothing is written until you approve the methodology and backlog.
+2. **Sprint / phase gate** — end of a sprint, phase, or every N cards.
+3. **Security escalation** — any high/critical finding halts the loop immediately.
+4. **Blocked escalation** — a card explicitly asking for you, or blocked two rounds running.
+5. **Round cap** — hits `max-rounds-per-sprint` (default 20) with work still open.
 
 ---
 
 ## Dashboard
 
-Run `/sdlc-dashboard` to launch a zero‑dependency local web UI (default `http://localhost:8787`). It shows **every** project that has run `/sdlc-init` (tracked in `~/.sdlc-team/projects.json`), most‑recently‑active first, and for each: the team, the live kanban board, the inbox, and the archive. It auto‑refreshes every few seconds and is strictly **read‑only** — it never modifies your projects. Pass `--root <dir>` to also scan a workspace for projects created elsewhere.
+```
+/sdlc-dashboard
+```
 
-```
-/sdlc-dashboard --port 8787
-```
+A zero-dependency local web UI at `http://localhost:8787` that watches **every** Boardroom project on your machine, most-recently-active first — and for each: the composed team, the live board, the inbox, and the archive. Refreshes every few seconds.
+
+It is strictly **read-only**. It never writes to your projects.
+
+Projects register themselves at `/sdlc-init` (tracked in `~/.sdlc-team/projects.json`). Pass `--root <dir>` to also scan a workspace for boards created elsewhere.
 
 ---
 
-## Non‑goals (v1)
+## Requirements
 
-External integrations (GitHub Issues / Slack / CI providers), Sofia fixing code herself, multiple concurrent boards per repo, and token budgeting beyond the round cap.
+- **Claude Code** (plugin support).
+- **Node.js ≥ 18** — only for `/sdlc-dashboard`. Everything else is plain Markdown and POSIX shell.
+- **git** — worktrees and branches are how workers stay isolated.
 
----
+## Not in scope (v1)
+
+External integrations (GitHub Issues / Slack / CI providers), the security reviewer fixing code itself, multiple concurrent boards in one repo, and token budgeting beyond the round cap.
 
 ## Repository layout
 
 ```
 boardroom/
-├── .claude-plugin/
-│   └── marketplace.json     # makes this repo an installable marketplace
-├── sdlc-team/               # the plugin
+├── .claude-plugin/marketplace.json   # makes this repo installable
+├── sdlc-team/                        # the plugin
 │   ├── .claude-plugin/plugin.json
-│   ├── agents/  commands/  skills/  hooks/  scripts/
-│   └── README.md
-└── docs/                    # build spec + implementation plans
+│   ├── agents/                       # manager, security-reviewer, qa-engineer
+│   ├── commands/                     # the /sdlc-* commands
+│   ├── skills/sdlc-board/            # board schemas + templates
+│   ├── hooks/                        # Stop hook
+│   └── scripts/                      # dashboard + board-check, with tests
+└── docs/                             # build spec + implementation plans
 ```
 
 ## License
 
-No license file yet — add one before sharing publicly if you want to set usage terms.
+None yet — add one before wider distribution if you want to set usage terms.
