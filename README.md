@@ -1,3 +1,5 @@
+![Boardroom](boardroom.png)
+
 # Boardroom
 
 **A Claude Code plugin that runs a full AI software team and automates the SDLC end‑to‑end on a shared Markdown Kanban board.**
@@ -15,16 +17,17 @@ You give it a project brief. It:
 3. **Ships code in rounds.** Each round: the manager updates the board, then specialist agents run **in parallel git worktrees**, each implementing one card and reporting back. The manager reviews, merges, and re‑plans.
 4. **Gates on humans where it matters.** Init approval, sprint/phase gates, high‑severity security findings, blocked cards, and a round cap all halt the loop and ask you.
 
-### The team
+### The team (composed per project)
 
-| Agent | Role | Writes code? | Scope |
-|-------|------|--------------|-------|
-| **Priya** | Manager / Orchestrator | No | The only writer of the board. Decomposes, assigns, merges, runs checkpoints. |
-| **Marcus** | Backend | Yes | APIs, business logic, DB, migrations. |
-| **Elena** | Frontend | Yes | UI, components, styling, client state. |
-| **Jamey** | DevOps | Yes (infra) | CI/CD, Docker, IaC, deploy scripts. |
-| **Sofia** | Security | No (v1) | Reviews diffs, rates findings, proposes fix tasks; high/critical → halt. |
-| **Dev** | QA | Tests only | Writes/runs tests, verifies DoD, signs off cards. |
+Three roles are always present:
+
+| Agent | Role | Writes code? |
+|-------|------|--------------|
+| **Priya** | Manager / Orchestrator | No — sole board writer; also composes the team |
+| **Sofia** | Security | No (v1) — reviews diffs, escalates high/critical |
+| **Dev** | QA | Tests only — verifies DoD, signs off |
+
+Everything else is **composed from your brief**: at `/sdlc-init` Priya picks the implementation specialists the project needs (backend, frontend, mobile, ML, data, infra, docs, …), writes each as an agent into your project's `.claude/agents/`, and records the roster in `.sdlc/team.md`. No fixed developer list.
 
 ---
 
@@ -33,6 +36,7 @@ You give it a project brief. It:
 - **Board is the single source of truth** (`.sdlc/kanban.md`) — and only the manager writes it.
 - **Workers never touch the board.** They report by dropping files in `.sdlc/inbox/`; the manager processes them oldest‑first and moves them unchanged into `.sdlc/archive/` (a replayable project history).
 - **Parallel workers, zero conflicts.** Each worker runs in its own git worktree on its own branch; the manager merges one branch at a time and turns merge conflicts into fix cards rather than resolving blindly.
+- **Dynamic roster.** Priya composes specialists per project into `.claude/agents/`; a one-time restart after the first `/sdlc-init` loads them (later additions hot-load).
 - **Definition of Done lives on every card** as checkboxes, each owned by the responsible role (Dev checks test boxes, Sofia security boxes, and so on). A card reaches Done only when every box is checked.
 - **A Stop hook** prevents a session from ending while cards are still open — unless the board is legitimately waiting on a human.
 

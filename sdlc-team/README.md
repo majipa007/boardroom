@@ -1,6 +1,6 @@
 # sdlc-team
 
-A Claude Code plugin that simulates a full software development team and automates the SDLC end-to-end. A manager agent (Priya) decomposes work onto a shared Markdown Kanban board; specialist workers (Marcus/backend, Elena/frontend, Jamey/DevOps, Sofia/security, Dev/QA) pick up assigned cards, write real code in isolated git worktrees, and report back through a file-based inbox queue. Work runs in rounds until the board is clear. Humans intervene only at defined checkpoints.
+A Claude Code plugin that simulates a full software development team and automates the SDLC end-to-end. A manager agent (Priya) **composes a project-specific team from your brief** — always a manager, a security reviewer (Sofia), and QA (Dev), plus whatever implementation specialists the project needs (backend, frontend, mobile, ML, data, …), which she writes as agents into your project's `.claude/agents/`. Specialists pick up assigned cards, write real code in isolated git worktrees, and report back through a file-based inbox queue. Work runs in rounds until the board is clear. Humans intervene only at defined checkpoints.
 
 ## Install / run
 
@@ -30,6 +30,7 @@ Validate:
 - **Parallel workers, zero conflicts**: each worker runs in its own git worktree; Priya merges one branch at a time and turns conflicts into fix cards.
 - **Definition of Done** lives on every card as checkboxes, each owned by the responsible role.
 - **Checkpoints** (init approval, sprint/phase gate, high/critical security finding, blocked escalation, round-cap) halt the loop and ask you. A Stop hook prevents the session ending with open cards unless `.sdlc/.awaiting-human` is set.
+- **The team is dynamic.** Priya composes the specialist roster from your brief at `/sdlc-init` and writes those agents into `.claude/agents/`. If that directory was newly created, restart Claude Code once before `/sprint` so the agents load (new roles added mid-project load automatically).
 
 ## Dashboard
 

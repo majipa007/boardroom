@@ -394,7 +394,7 @@ Safety rails:
 
 ## 11. Non-goals for v1 (explicitly out of scope)
 
-- Dynamic team composition (adding/removing personas at runtime).
+- ~~Dynamic team composition (adding/removing personas at runtime).~~ **Superseded (2026-07-25): the manager now composes a project-specific roster and writes specialist agent files at init; see docs/superpowers/plans/2026-07-25-dynamic-team.md.**
 - External integrations (GitHub Issues sync, Slack, CI providers) — the board is self-contained.
 - Sofia writing fixes herself (she only proposes tasks).
 - Multiple concurrent sprints/boards per repo.

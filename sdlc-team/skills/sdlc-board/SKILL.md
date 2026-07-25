@@ -94,7 +94,7 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 - `type: escalation` messages (e.g. a high/critical security finding) trigger an immediate human checkpoint.
 - **Delivering messages across worktrees.** A worker running in an isolated worktree (`isolation: worktree`) must **commit** its inbox message file onto its working branch — `git add .sdlc/inbox/<file>` then commit with a `[T-###]` message. Untracked files created inside a worktree are invisible to the manager, so an uncommitted inbox message is never delivered. A worker running in the main checkout (Sofia) instead writes the inbox file directly and does not commit it (the manager owns commits on the main branch).
 
-## Common worker protocol (Marcus, Elena, Jamey, Sofia, Dev)
+## Common worker protocol (Sofia, Dev, and each project-composed specialist)
 
 Read `.sdlc/kanban.md`. Find cards assigned to you in Backlog or In Progress. Work the highest-priority unblocked one. **Never edit kanban.md.** Report everything via a new file in `.sdlc/inbox/` following the message schema above. If you are running in an isolated worktree, commit that inbox file onto your working branch (`git add` + `[T-###]` commit) so the manager can read it — uncommitted worktree files never reach the manager. If you are running in the main checkout, just write the file. If nothing is assigned to you, scan Review/notes for anything addressed to you; if still nothing, write a GENERAL inbox message saying you are idle and end your turn.
 
