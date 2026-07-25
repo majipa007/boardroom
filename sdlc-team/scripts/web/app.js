@@ -271,8 +271,8 @@ async function poll() {
     const d = await r.json();
     if (!d.project) throw new Error(d.error || 'no projects found');
 
-    delete document.body.dataset.state;
     if (d.revision === lastRevision) return;      // unchanged — no repaint
+    delete document.body.dataset.state;           // clearing an error IS a change
     lastRevision = d.revision;
     currentData = d;
     selectedProject = d.project.id;
