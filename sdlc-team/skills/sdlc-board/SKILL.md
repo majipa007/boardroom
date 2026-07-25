@@ -29,37 +29,37 @@ Columns, in fixed order. Cards live under a column heading.
 ```
 
 **Column rules:**
-- **Blocked** is processed FIRST every round. Any card here MUST contain a `question:` line addressed to Priya, or `question(HUMAN):` for the human.
+- **Blocked** is processed FIRST every round. Any card here MUST contain a `question:` line addressed to the Manager, or `question(HUMAN):` for the human.
 - A card enters **Done** only when every Definition-of-Done checkbox is checked.
-- **Only Priya edits this file.** Everyone else requests changes via the inbox.
+- **Only the Manager edits this file.** Everyone else requests changes via the inbox.
 
 ## Card schema
 
 ```markdown
 ### T-014 | Implement JWT refresh endpoint
 - assignee: Marcus
-- created-by: Priya
+- created-by: Manager
 - phase: Sprint 2
 - priority: high
 - depends-on: [T-011]
 - branch: sdlc/T-014-jwt-refresh          # set when work starts
-- flow: worktree → implement → tests → inbox report → Sofia review → Dev QA → merge
+- flow: worktree → implement → tests → inbox report → Security Reviewer review → QA Engineer review → merge
 - what: |
     Add POST /auth/refresh. Rotate refresh tokens, invalidate old token,
     return new access+refresh pair. Follow existing error envelope in src/api/errors.ts.
 - definition-of-done:
   - [ ] Endpoint implemented and returns correct status codes (200/401/403)
-  - [ ] Unit + integration tests written and passing (Dev verifies)
-  - [ ] No new high/critical findings (Sofia signs off)
-  - [ ] Branch merges cleanly to main (Priya verifies)
+  - [ ] Unit + integration tests written and passing (QA Engineer verifies)
+  - [ ] No new high/critical findings (Security Reviewer signs off)
+  - [ ] Branch merges cleanly to main (Manager verifies)
 - status-log:
-  - 2026-07-24T10:02 created by Priya
+  - 2026-07-24T10:02 created by Manager
   - 2026-07-24T10:31 Marcus started (worktree created)
 ```
 
 **Card rules:**
-- Task IDs are `T-###`, monotonically increasing, assigned only by Priya.
-- A DoD checkbox may only be checked by the role that owns it: Dev owns test boxes, Sofia owns security boxes, the implementing worker owns implementation boxes, Priya owns the merge box. Ownership is requested via inbox and applied by Priya.
+- Task IDs are `T-###`, monotonically increasing, assigned only by the Manager.
+- A DoD checkbox may only be checked by the role that owns it: the QA Engineer owns test boxes, the Security Reviewer owns security boxes, the implementing worker owns implementation boxes, the Manager owns the merge box. Ownership is requested via inbox and applied by the Manager.
 
 ## Inbox protocol — `.sdlc/inbox/`
 
@@ -81,7 +81,7 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 
 ## Notes for others
 - note(Elena): response shape for /auth/refresh documented in src/api/types.ts
-- note(Sofia): please pay attention to token rotation logic in src/auth/refresh.ts
+- note(Security Reviewer): please pay attention to token rotation logic in src/auth/refresh.ts
 
 ## New task proposals
 (none)
@@ -89,16 +89,16 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 
 **Inbox rules:**
 - Workers **never** edit `kanban.md`. All board changes are *requests* in inbox messages.
-- `proposed-task` messages contain a full draft card; Priya decides whether it becomes a real card.
-- After processing, Priya moves the file **unchanged** to `archive/` (`mv`, not rewrite). `archive/` is a replayable project history and MUST be committed.
+- `proposed-task` messages contain a full draft card; the Manager decides whether it becomes a real card.
+- After processing, the Manager moves the file **unchanged** to `archive/` (`mv`, not rewrite). `archive/` is a replayable project history and MUST be committed.
 - `type: escalation` messages (e.g. a high/critical security finding) trigger an immediate human checkpoint.
-- **Delivering messages across worktrees.** A worker running in an isolated worktree (`isolation: worktree`) must **commit** its inbox message file onto its working branch — `git add .sdlc/inbox/<file>` then commit with a `[T-###]` message. Untracked files created inside a worktree are invisible to the manager, so an uncommitted inbox message is never delivered. A worker running in the main checkout (Sofia) instead writes the inbox file directly and does not commit it (the manager owns commits on the main branch).
+- **Delivering messages across worktrees.** A worker running in an isolated worktree (`isolation: worktree`) must **commit** its inbox message file onto its working branch — `git add .sdlc/inbox/<file>` then commit with a `[T-###]` message. Untracked files created inside a worktree are invisible to the manager, so an uncommitted inbox message is never delivered. A worker running in the main checkout (the Security Reviewer) instead writes the inbox file directly and does not commit it (the manager owns commits on the main branch).
 
-## Common worker protocol (Sofia, Dev, and each project-composed specialist)
+## Common worker protocol (the Security Reviewer, the QA Engineer, and each project-composed specialist)
 
 Read `.sdlc/kanban.md`. Find cards assigned to you in Backlog or In Progress. Work the highest-priority unblocked one. **Never edit kanban.md.** Report everything via a new file in `.sdlc/inbox/` following the message schema above. If you are running in an isolated worktree, commit that inbox file onto your working branch (`git add` + `[T-###]` commit) so the manager can read it — uncommitted worktree files never reach the manager. If you are running in the main checkout, just write the file. If nothing is assigned to you, scan Review/notes for anything addressed to you; if still nothing, write a GENERAL inbox message saying you are idle and end your turn.
 
-Respect your role's hard boundaries (see `.sdlc/team.md`). If a card needs work outside your scope, do NOT do it — file a `proposed-task` so Priya can route it, and note the dependency.
+Respect your role's hard boundaries (see `.sdlc/team.md`). If a card needs work outside your scope, do NOT do it — file a `proposed-task` so the Manager can route it, and note the dependency.
 
 Git discipline (workers that write code): work only on branch `sdlc/<task-id>-<slug>` created from `main`; prefix every commit with `[T-###]`; never commit to `main`.
 
@@ -108,11 +108,11 @@ DoD honesty: only ever *request* a DoD box check via inbox, and only for a box y
 
 The team is composed per project, not fixed. Three roles are always present and ship with the plugin:
 
-- **Priya — Manager / Orchestrator** (`priya-manager`): the only writer of `kanban.md`; decomposes, assigns, merges, runs checkpoints, and **composes the rest of the team**.
-- **Sofia — Security** (`sofia-security`): read-only reviewer; high/critical findings escalate.
-- **Dev — QA** (`dev-qa`): tests only; verifies DoD and signs off.
+- **Manager / Orchestrator** (`manager`): the only writer of `kanban.md`; decomposes, assigns, merges, runs checkpoints, and **composes the rest of the team**.
+- **Security Reviewer** (`security-reviewer`): read-only reviewer; high/critical findings escalate.
+- **QA Engineer** (`qa-engineer`): tests only; verifies DoD and signs off.
 
-Every **implementation specialist** (backend, frontend, mobile, ML, data, infra, docs, …) is chosen by Priya from the project brief and written as a project-level agent file under the target project's `.claude/agents/<slug>.md`, generated from `templates/worker-agent.md`. Rules Priya follows when composing:
+Every **implementation specialist** (backend, frontend, mobile, ML, data, infra, docs, …) is chosen by the Manager from the project brief and written as a project-level agent file under the target project's `.claude/agents/<slug>.md`, generated from `templates/worker-agent.md`. Rules the Manager follows when composing:
 
 - Pick the smallest set of specialist roles the brief actually needs (skip frontend if there's no UI; add an ML engineer if there's a model; etc.). Manager, Security, and QA are always included.
 - Each specialist gets a unique lowercase-hyphen `name` (e.g. `ml-engineer`, `ios-developer`, `data-engineer`), a clear `Role`, and explicit owned / out-of-scope boundaries so roles don't overlap.

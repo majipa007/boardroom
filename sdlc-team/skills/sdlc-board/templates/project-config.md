@@ -3,7 +3,7 @@
 - created: <date>
 - methodology: agile            # chosen by model, human-overridable
 - methodology-reasoning: |
-    <Priya's written justification>
+    <the Manager's written justification>
 - sprint-length: 1 round-batch  # or waterfall phase list
 - max-rounds-per-sprint: 20
 - parallelism: 3                # max workers spawned concurrently per round
