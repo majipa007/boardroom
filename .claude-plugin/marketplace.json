@@ -1,0 +1,14 @@
+{
+  "name": "boardroom",
+  "description": "Boardroom marketplace — the sdlc-team plugin: an AI software team that automates the SDLC on a shared Kanban board.",
+  "owner": {
+    "name": "majipa007"
+  },
+  "plugins": [
+    {
+      "name": "sdlc-team",
+      "source": "./sdlc-team",
+      "description": "Simulates a full software development team and automates the SDLC end-to-end via a shared Markdown Kanban board, a manager orchestrator, and specialist worker agents."
+    }
+  ]
+}
