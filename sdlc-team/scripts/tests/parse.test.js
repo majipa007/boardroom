@@ -191,6 +191,22 @@ test('parseKanban extracts DoD counts, deps, branch, reviewer and questions', ()
   assert.deepStrictEqual(review.reviewer, { name: 'Sofia', id: 'security-reviewer' });
 });
 
+test('parseKanban captures each card\'s raw markdown with no bleed between cards', () => {
+  const { board } = parseKanban(RICH_KANBAN);
+  const review = board.Review[0]; // T-002
+  assert.match(review.raw, /^### T-002 \| Docker \+ Prisma$/m);
+  assert.match(review.raw, /- branch: sdlc\/T-002-docker/);
+  assert.match(review.raw, /- \[x\] compose up works/);
+  // must not include the other card's content
+  assert.doesNotMatch(review.raw, /T-006/);
+  assert.doesNotMatch(review.raw, /Authz middleware/);
+
+  const blocked = board.Blocked[0]; // T-006
+  assert.match(blocked.raw, /^### T-006 \| Authz middleware$/m);
+  assert.doesNotMatch(blocked.raw, /Docker \+ Prisma/);
+  assert.doesNotMatch(blocked.raw, /sdlc\/T-002-docker/);
+});
+
 test('parseProject exposes config and awaitingHuman', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proj2-'));
   const sdlc = path.join(dir, '.sdlc');

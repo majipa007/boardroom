@@ -30,8 +30,13 @@ function normalizePriority(p) {
   return 'med';
 }
 
-// HH:MM out of an ISO timestamp, without constructing a Date (keeps it pure).
+// HH:MM in the viewer's local time zone. Falls back to slicing the ISO string
+// (its original, UTC-only behavior) if the timestamp doesn't parse as a Date.
 function hhmm(timestamp) {
+  const d = new Date(timestamp);
+  if (!Number.isNaN(d.getTime())) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
   const m = String(timestamp || '').match(/T(\d{2}):(\d{2})/);
   return m ? `${m[1]}:${m[2]}` : '--:--';
 }
@@ -76,6 +81,7 @@ function buildBoardJson(projectDir) {
         reviewer: c.reviewer ? c.reviewer.id : null,
         reviewerName: c.reviewer ? c.reviewer.name : null,
         dependsOn: c.dependsOn || [],
+        raw: c.raw || '',
       });
     }
   }
@@ -116,7 +122,6 @@ function buildBoardJson(projectDir) {
     project: {
       id: path.basename(projectDir),
       name: p.name,
-      path: p.path,
       methodology: p.methodology,
       phase: p.phase,
       round: p.round,

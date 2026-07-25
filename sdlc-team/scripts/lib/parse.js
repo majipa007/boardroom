@@ -71,12 +71,16 @@ function parseKanban(text) {
         id: m[1], title: m[2], assignee: '', priority: '', column: col,
         assigneeName: '', assigneeId: '', branch: '', reviewer: null,
         dependsOn: [], question: '', questionFor: '',
-        dod: { done: 0, total: 0 },
+        dod: { done: 0, total: 0 }, raw: '',
       } : null;
       if (card) board[col].push(card);
       inDod = false;
+      if (card) card.raw = line;
       continue;
     }
+    // Capture every line belonging to the current card, verbatim, before any
+    // per-field matching below — spec §5 allows raw card markdown in the overlay.
+    if (card) card.raw += (card.raw ? '\n' : '') + line;
     if (card && (m = line.match(/^\s*-\s*assignee:\s*(.+?)\s*$/))) {
       const clean = stripInlineComment(m[1]);
       card.assignee = clean;

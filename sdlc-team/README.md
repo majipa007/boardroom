@@ -29,7 +29,7 @@ Requires **Node.js ≥ 18** for `/sdlc-dashboard` only; everything else is Markd
 | `/status` | Read-only board summary. |
 | `/standup` | One line per team member. |
 | `/sdlc-override <methodology\|key=value>` | Change methodology or config; the manager restructures the board and logs the decision. |
-| `/sdlc-dashboard [--port N] [--root DIR]` | Launch the read-only local web dashboard — two themes (Sprint Wall / Blueprint), live board, team, inbox and archive for every project. |
+| `/sdlc-dashboard [--port N] [--root DIR]` | Launch the read-only local web dashboard — two themes (Sprint Wall / Blueprint), live board, team, and a recent-activity feed drawn from the archive, for every project. |
 
 ## The team
 

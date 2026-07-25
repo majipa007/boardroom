@@ -33,12 +33,16 @@ body{
 .member[data-busy]::after{content:"▸ working";font-size:9.5px;font-weight:800;margin-left:2px}
 
 .col h2{font-size:18px;margin-bottom:14px}
-.col h2 span{font-size:13px;opacity:.6;margin-left:6px}
+/* AA sweep: these shared opacities were tuned for the Wall theme in the demo and
+   measured below 4.5:1 there (and, doubled onto an already-dimmed colour, in
+   Blueprint too). Raised just enough to clear the floor in both themes — see
+   the contrast script in the fix report for the measured ratios. */
+.col h2 span{font-size:13px;opacity:.72;margin-left:6px}
 .card{position:relative;padding:13px 14px 12px;margin-bottom:16px;cursor:pointer;transition:transform .15s}
-.tid{font-size:10px;font-weight:800;letter-spacing:.1em;opacity:.6}
+.tid{font-size:10px;font-weight:800;letter-spacing:.1em;opacity:.78}
 .ttl{font-size:16px;line-height:1.15;margin:3px 0 7px;font-weight:700}
 .who{font-size:11px;font-weight:800}
-.dod{margin-top:7px;font-size:10.5px;font-weight:700;opacity:.75}
+.dod{margin-top:7px;font-size:10.5px;font-weight:700;opacity:.8}
 .dod .bar{height:4px;border-radius:2px;margin-top:4px;overflow:hidden;background:rgba(0,0,0,.14)}
 .dod .bar i{display:block;height:100%}
 .q{font-size:11.5px;font-weight:700;border-radius:4px;padding:6px 8px;margin-top:7px;line-height:1.4}
@@ -48,15 +52,18 @@ body{
 .feed h4{font-size:11px;letter-spacing:.18em;margin-bottom:8px;opacity:.75}
 /* ADAPTATION 3: scoped to .row so the #feedRows wrapper isn't styled as a row. */
 .feed .row{display:flex;gap:14px;font-size:12px;padding:3px 0}
-.feed time{opacity:.55;min-width:44px}
+.feed time{opacity:.7;min-width:44px}
 
 /* ADDED (no demo reference): empty hints, overlay, focus rings */
-.empty{font-size:13px;opacity:.55;margin-top:4px}
+.empty{font-size:13px;opacity:.72;margin-top:4px}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:20px;z-index:50}
 .overlay[hidden]{display:none}
 .sheet{position:relative;max-width:560px;width:100%;max-height:80vh;overflow-y:auto;padding:20px 22px}
 .sheet h3{margin-bottom:10px}
 .sheet p{margin:6px 0;font-size:13px;line-height:1.45}
+/* ADDED (no demo reference): raw card markdown, spec §5's "raw markdown is
+   acceptable content for v1" escape hatch. */
+.sheet .raw{margin-top:10px;font-family:monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;overflow-x:auto;padding:10px 12px;border-radius:4px}
 .x{position:absolute;top:8px;right:10px;cursor:pointer;font-size:20px;line-height:1;background:none;border:0;color:inherit}
 .card:focus-visible,.ptab:focus-visible,.toggle:focus-visible,.x:focus-visible,#railSelect:focus-visible{outline:3px solid #4C9AFF;outline-offset:2px}
 
@@ -76,6 +83,8 @@ body[data-theme="wall"] .meta b{color:#2E2A26}
 body[data-theme="wall"] .gate{font-family:'Caveat',cursive;font-size:20px;background:#fff;padding:6px 16px;border-radius:4px;box-shadow:2px 3px 8px rgba(0,0,0,.12);transform:rotate(1.5deg);border-left:6px solid #FFD2A6}
 body[data-theme="wall"] .gate[data-attention="true"]{border-left-color:#B33A3A;color:#B33A3A;font-weight:700}
 body[data-theme="wall"] .toggle{background:#2E2A26;color:#F5EFE4;border-color:#2E2A26;font-family:'Nunito',sans-serif}
+/* ADDED (no demo reference): #railSelect only appears ≤1100px, styled to match Wall's other controls */
+body[data-theme="wall"] #railSelect{background:#fff;color:#2E2A26;border:1px solid rgba(0,0,0,.14);border-radius:3px;font-family:'Nunito',sans-serif}
 body[data-theme="wall"] .member{background:#fff;border-radius:20px;box-shadow:1px 2px 5px rgba(0,0,0,.12)}
 body[data-theme="wall"] .face{font-family:'Caveat',cursive}
 body[data-theme="wall"] .member[data-busy]::after{color:#3E8E5A}
@@ -110,6 +119,13 @@ body[data-theme="wall"] .feed{background:rgba(255,255,255,.9);border-radius:10px
 body[data-theme="wall"] .feed b{font-weight:800}
 body[data-theme="wall"] .empty{font-family:'Caveat',cursive;font-size:17px}
 body[data-theme="wall"] .sheet{background:#fff;color:#2E2A26;border-radius:4px;box-shadow:3px 8px 20px rgba(0,0,0,.3)}
+body[data-theme="wall"] .sheet .raw{background:#F5EFE4;color:#2E2A26}
+
+/* ADDED (no demo reference): a failed fetch shouldn't leave stale panels on screen */
+body[data-theme="wall"][data-state="error"] .team,
+body[data-theme="wall"][data-state="error"] .feed,
+body[data-theme="wall"][data-state="error"] .titleblock{display:none}
+body[data-theme="wall"][data-state="error"] .gate{border-left-color:#B33A3A;color:#B33A3A;font-weight:700}
 
 /* ============================================================
    THEME: BLUEPRINT
@@ -128,6 +144,8 @@ body[data-theme="blueprint"] .meta b{color:#E8F0FF}
 body[data-theme="blueprint"] .gate{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;border:1px dashed var(--lineW);padding:6px 14px;color:var(--warn)}
 body[data-theme="blueprint"] .gate[data-attention="true"]{border-style:solid;border-color:var(--alarm);color:var(--alarm)}
 body[data-theme="blueprint"] .toggle{background:transparent;color:#E8F0FF;border-color:var(--lineW);font-family:'Oswald',sans-serif;letter-spacing:.15em;text-transform:uppercase;border-radius:0}
+/* ADDED (no demo reference): #railSelect only appears ≤1100px; dark fill keeps the native dropdown readable */
+body[data-theme="blueprint"] #railSelect{background:#0E3168;color:#E8F0FF;border:1px solid var(--lineW);border-radius:0;font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
 
 /* ADDED (no demo reference): rail as a SHEET INDEX panel */
 body[data-theme="blueprint"] .rail{border-right:1px solid var(--lineW)}
@@ -135,7 +153,9 @@ body[data-theme="blueprint"] .rail h4{font-family:'Oswald',sans-serif;letter-spa
 body[data-theme="blueprint"] .rail h4::after{content:" — SHEET INDEX"}
 body[data-theme="blueprint"] .ptab{background:rgba(9,34,74,.55);color:#E8F0FF;border:1px solid var(--lineW);border-radius:0;font-family:'IBM Plex Mono',monospace}
 body[data-theme="blueprint"] .ptab b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
-body[data-theme="blueprint"] .ptab small{color:#9DB4E0;letter-spacing:.08em}
+/* These already carry a dimmed colour (#9DB4E0 / #E8F0FF); the shared opacity
+   on top of that is what pushed them below 4.5:1 (measured 3.33/4.06/4.45). */
+body[data-theme="blueprint"] .ptab small{color:#9DB4E0;letter-spacing:.08em;opacity:1}
 body[data-theme="blueprint"] .ptab[data-active="true"]{border-left:3px solid var(--ok)}
 
 /* width:max-content keeps the manifest on one line like the demo; the overflow
@@ -145,11 +165,12 @@ body[data-theme="blueprint"] .member{border-right:1px dashed var(--lineF);paddin
 body[data-theme="blueprint"] .member:last-child{border-right:0}
 body[data-theme="blueprint"] .face{display:none}
 body[data-theme="blueprint"] .member b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
-body[data-theme="blueprint"] .member small{letter-spacing:.12em;text-transform:uppercase;color:#9DB4E0}
+body[data-theme="blueprint"] .member small{letter-spacing:.12em;text-transform:uppercase;color:#9DB4E0;opacity:1}
 body[data-theme="blueprint"] .member[data-busy]::after{content:"▸ RUNNING";color:var(--ok)}
 
 body[data-theme="blueprint"] .col{border-top:1px solid var(--lineW);border-right:0;padding:10px 0 0}
 body[data-theme="blueprint"] .col h2{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.2em;text-transform:uppercase;background:none;box-shadow:none;transform:none;width:auto;margin:0 0 14px;padding:0;text-align:left}
+body[data-theme="blueprint"] .col h2 span{opacity:1}
 body[data-theme="blueprint"] .card{background:rgba(9,34,74,.55);border:1px solid var(--lineW);border-radius:0;box-shadow:none;max-width:none;transform:none;color:#E8F0FF}
 body[data-theme="blueprint"] .card::before{content:none}
 body[data-theme="blueprint"] .card:hover{transform:translateY(-2px)}
@@ -162,7 +183,8 @@ body[data-theme="blueprint"] .dod{color:#9DB4E0}
 body[data-theme="blueprint"] .dod .bar{background:rgba(214,228,255,.15)}
 body[data-theme="blueprint"] .dod .bar i{background:var(--ok)}
 body[data-theme="blueprint"] .q{color:var(--alarm);background:rgba(255,156,143,.07);border-left:2px solid var(--alarm);border-radius:0}
-body[data-theme="blueprint"] .q::before{content:"RFI → HUMAN: ";letter-spacing:.1em}
+body[data-theme="blueprint"] .q::before{content:"RFI → MANAGER: ";letter-spacing:.1em}
+body[data-theme="blueprint"] .card[data-question-for="human"] .q::before{content:"RFI → HUMAN: "}
 body[data-theme="blueprint"] .card[data-stamp]::after{content:attr(data-stamp-bp);font-family:'Oswald',sans-serif;letter-spacing:.14em;top:8px;bottom:auto;border-radius:0}
 body[data-theme="blueprint"] .card[data-stamp="merged"]::after{color:var(--ok);border-color:var(--ok)}
 body[data-theme="blueprint"] .card[data-stamp="hold"]::after{color:var(--alarm);border-color:var(--alarm)}
@@ -176,12 +198,19 @@ body[data-theme="blueprint"] .feed time{color:#E8F0FF}
 /* ADDED (no demo reference): dashed empty placeholder, overlay surface */
 body[data-theme="blueprint"] .empty{border:1px dashed var(--lineW);padding:10px;text-align:center;font-family:'Oswald',sans-serif;letter-spacing:.14em;font-size:11px;opacity:.85}
 body[data-theme="blueprint"] .sheet{background:#0E3168;color:#E8F0FF;border:1px solid var(--lineW);border-radius:0}
+body[data-theme="blueprint"] .sheet .raw{background:rgba(9,34,74,.55);color:#E8F0FF;border:1px solid var(--lineW);border-radius:0}
 
 body[data-theme="blueprint"] .titleblock{display:grid;grid-template-columns:repeat(4,auto);width:max-content;margin:0 32px 30px auto;border:1px solid var(--lineW);background:rgba(9,34,74,.85)}
 body[data-theme="blueprint"] .titleblock div{padding:8px 16px;border-left:1px solid var(--lineF)}
 body[data-theme="blueprint"] .titleblock div:first-child{border-left:0}
 body[data-theme="blueprint"] .titleblock small{display:block;font-size:9px;letter-spacing:.18em;color:#9DB4E0}
 body[data-theme="blueprint"] .titleblock b{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.08em}
+
+/* ADDED (no demo reference): a failed fetch shouldn't leave stale panels on screen */
+body[data-theme="blueprint"][data-state="error"] .team,
+body[data-theme="blueprint"][data-state="error"] .feed,
+body[data-theme="blueprint"][data-state="error"] .titleblock{display:none}
+body[data-theme="blueprint"][data-state="error"] .gate{border-style:solid;border-color:var(--alarm);color:var(--alarm)}
 
 /* ============================================================
    RESPONSIVE
@@ -200,6 +229,10 @@ body[data-theme="blueprint"] .titleblock b{font-family:'Oswald',sans-serif;font-
   .board{padding:14px 14px 24px}
   .feed{margin:0 16px 24px}
   body[data-theme="wall"] .col{border-right:0}
+  /* Blueprint's .team sets its own margin (not padding) to draw the manifest
+     border flush; match the 16px the other panels drop to here, keeping the
+     overflow guard's max-width math (calc(100% - 64px) -> 32px) in sync. */
+  body[data-theme="blueprint"] .team{margin:14px 16px 0;max-width:calc(100% - 32px)}
 }
 
 /* ============================================================

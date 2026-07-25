@@ -228,7 +228,7 @@ Methodology changes how work is batched and where gates fall. The board and queu
 /sdlc-dashboard
 ```
 
-A zero-dependency local web UI at `http://localhost:8787` that watches **every** Boardroom project on your machine, most-recently-active first — and for each: the composed team, the live board, the inbox, and the archive. It polls every 5 seconds and repaints only when something actually changed.
+A zero-dependency local web UI at `http://localhost:8787` that watches **every** Boardroom project on your machine, most-recently-active first — and for each: the composed team, the live board, and a recent-activity feed drawn from the archive. It polls every 5 seconds and repaints only when something actually changed.
 
 Two themes over the same board, toggled from the header and remembered across reloads:
 

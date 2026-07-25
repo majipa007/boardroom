@@ -140,6 +140,7 @@ function cardNode(c, byId) {
   a.dataset.status = c.status;
   a.dataset.agent = c.assignee || '';
   if (c.priority) a.dataset.priority = c.priority;
+  if (c.questionFor) a.dataset.questionFor = c.questionFor;
   const stamp = STAMPS[c.status];
   if (stamp) {
     a.dataset.stamp = stamp[0];
@@ -246,6 +247,12 @@ function openOverlay(c) {
   if (c.question) body.appendChild(el('p', null, `question (${c.questionFor}): ${c.question}`));
   if (c.dod && c.dod.total) {
     body.appendChild(el('p', null, `definition of done: ${c.dod.done} of ${c.dod.total} complete`));
+  }
+  if (c.raw) {
+    const pre = document.createElement('pre');
+    pre.className = 'raw';
+    pre.textContent = c.raw;            // textContent — never innerHTML
+    body.appendChild(pre);
   }
   document.getElementById('overlay').hidden = false;
   document.getElementById('overlayClose').focus();
