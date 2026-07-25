@@ -16,6 +16,7 @@
 - **The frontend never parses markdown.** It depends only on fetching `./board.json`.
 - **Poll every 5 seconds**; re-render only when `revision` changed (no full repaint otherwise).
 - **Dashboard stays strictly read-only** toward every project — it never creates, edits, moves, or deletes anything under a project's `.sdlc/`.
+- **`boardroom-dashboard-demo.html` (repo root) is the pixel source of truth.** Where this plan or the spec disagrees with the demo on *visuals*, the demo wins; this plan wins on *behavior and data*. Tasks 4–6 are ported from it, and the four sanctioned divergences are listed in each of those tasks.
 - **DOM contract of §3 is fixed.** Class names and `data-` attributes are the API between markup and the two stylesheets. Both themes style that exact skeleton; **all visual change comes from CSS keyed on `body[data-theme]`**.
 - `data-theme` ∈ `wall` | `blueprint`; default `wall`; persisted in `localStorage` key `boardroom.theme`; all storage access wrapped in try/catch.
 - **Stamp attributes** — set all three on every non-backlog card: blocked → `data-stamp="hold"` / `data-stamp-wall="held ✋"` / `data-stamp-bp="HOLD"`; progress → `wip` / `on it ✍` / `W.I.P.`; review → `inspect` / `checking 👀` / `INSPECT`; done → `merged` / `merged ✓` / `MERGED`; backlog → no stamp attributes at all.
@@ -944,68 +945,70 @@ git commit -m "feat(dashboard): serve /board.json contract and web assets"
 - Create: `sdlc-team/scripts/web/app.js`
 - Create: `sdlc-team/scripts/web/theme.css` (placeholder in this task — a single comment line; Tasks 5 and 6 fill it)
 
+**Reference:** `boardroom-dashboard-demo.html` at the repo root is the markup source of truth. The DOM below reproduces the demo's markup exactly, and adds only the three things the demo has no reference for: the project rail (§8), the card overlay (§5), and the error/empty states (§5, §9).
+
 **Interfaces:**
 - Consumes from Task 3: `GET ./board.json[?project=<id>]` and the asset routes `/app.js`, `/theme.css`.
-- Produces, for Tasks 5 and 6, exactly the §3 skeleton and these hooks (the two stylesheets depend on them verbatim):
-  - `body[data-theme="wall"|"blueprint"]`, and `body[data-state="error"]` when the fetch fails.
-  - `header.hdr` > `h1.proj`, `span.meta`, `span.gate` (plus `.gate[data-attention="true"]` when a human question is open), `button.toggle#themeToggle[aria-pressed]`.
-  - `aside.rail` > `h4` + `button.ptab[data-project][data-active]` per project; `select#railSelect` mirror for narrow screens.
-  - `section.team` > `span.member[data-agent][data-busy]` > `span.face` + `b` + `small`.
-  - `main.board` > `section.col[data-col]` ×5 > `h2` (label + `span.count`) + `article.card[...]`, and `p.empty` when the column has no cards.
-  - `article.card[data-status][data-agent][data-priority][data-stamp][data-stamp-wall][data-stamp-bp]` > `span.tid`, `h3.ttl`, `div.who`, optional `div.dod` > `div.bar` > `i`, optional `p.q`.
-  - `footer.feed` > `h4` + `div.row` > `time` + `span`.
-  - `div.titleblock` > `div.tb-row` > `b` + `span`.
-  - `div.overlay#overlay[hidden]` > `div.sheet` > `button.x` + `#overlayBody`.
+- Produces, for Tasks 5 and 6, exactly these hooks (both stylesheets depend on them verbatim):
+  - `body[data-theme="wall"|"blueprint"]`, plus `body[data-state="error"]` when the fetch fails.
+  - `header.hdr` > `h1.proj`, `span.meta` (contains `<b>` around methodology, round and worktree count), `span.gate` (gains `data-attention="true"` when a human question is open), `select#railSelect`, `button.toggle#themeToggle[aria-pressed]`.
+  - `aside.rail` > `h4` + `button.ptab[data-project][data-active]` per project.
+  - `section.team#team` > `span.member[data-agent][data-busy]` > `span.face` + `b` + `small`. **`data-busy` is a bare valueless attribute** (the demo's CSS selector is `[data-busy]`).
+  - `main.board#board` > `section.col[data-col]` ×5 > `h2` (label text + `span.count`) + `article.card`, plus `p.empty` when a column has no cards.
+  - `article.card[data-status][data-agent][data-priority?][data-stamp?][data-stamp-wall?][data-stamp-bp?]` > `span.tid`, `h3.ttl`, `div.who`, optional `div.dod` > `div.bar` > `i`, optional `p.q`. Backlog cards carry no `data-stamp*`. Each card sets a `--note` custom property to its agent's colour.
+  - `footer.feed` > `h4` + `div.row` > `time` + `span` (agent name inside `<b>`).
+  - `div.titleblock#titleblock` > four `div` > `small` + `b`.
+  - `div.overlay#overlay[hidden]` > `div.sheet` > `button.x#overlayClose` + `#overlayBody`.
+- **Column labels are the demo's:** `Blocked`, `Backlog`, `Doing`, `Review`, `Done` (note "Doing", not "In Progress"), keyed to `data-col` values `blocked|backlog|progress|review|done`.
 
 - [ ] **Step 1: Write the HTML skeleton**
 
 Create `sdlc-team/scripts/web/index.html`:
 
 ```html
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>boardroom — sprint board</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;800&family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>boardroom — Sprint Wall / Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800&family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./theme.css">
 </head>
 <body data-theme="wall">
-  <header class="hdr">
-    <h1 class="proj">boardroom</h1>
-    <span class="meta">loading…</span>
-    <span class="gate"></span>
-    <select id="railSelect" aria-label="Select project"></select>
-    <button class="toggle" id="themeToggle" type="button" aria-pressed="false">⇄ BLUEPRINT MODE</button>
-  </header>
 
-  <aside class="rail">
-    <h4>projects</h4>
-    <div id="railList"></div>
-  </aside>
+<header class="hdr">
+  <h1 class="proj">boardroom</h1>
+  <span class="meta">loading…</span>
+  <span class="gate"></span>
+  <select id="railSelect" aria-label="Select project"></select>
+  <button class="toggle" id="themeToggle" type="button" aria-pressed="false">⇄ BLUEPRINT MODE</button>
+</header>
 
-  <section class="team" id="team" aria-label="Team"></section>
+<aside class="rail" aria-label="Projects">
+  <h4>PROJECTS</h4>
+  <div id="railList"></div>
+</aside>
 
-  <main class="board" id="board"></main>
+<section class="team" id="team" aria-label="Team"></section>
 
-  <footer class="feed">
-    <h4>activity</h4>
-    <div id="feedRows"></div>
-  </footer>
+<main class="board" id="board"></main>
 
-  <div class="titleblock" id="titleblock"></div>
+<footer class="feed" aria-label="Activity">
+  <h4>ACTIVITY — INBOX / ARCHIVE</h4>
+  <div id="feedRows"></div>
+</footer>
 
-  <div class="overlay" id="overlay" hidden>
-    <div class="sheet" role="dialog" aria-modal="true" aria-label="Card detail">
-      <button class="x" id="overlayClose" type="button" aria-label="Close">×</button>
-      <div id="overlayBody"></div>
-    </div>
+<div class="titleblock" id="titleblock"></div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Card detail">
+    <button class="x" id="overlayClose" type="button" aria-label="Close">×</button>
+    <div id="overlayBody"></div>
   </div>
+</div>
 
-  <script src="./app.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>
 ```
@@ -1017,20 +1020,20 @@ Create `sdlc-team/scripts/web/app.js`:
 ```js
 'use strict';
 
+// data-col value -> demo's column heading text
 const COLS = [
-  ['blocked', 'blocked'],
-  ['backlog', 'backlog'],
-  ['progress', 'in progress'],
-  ['review', 'review'],
-  ['done', 'done'],
+  ['blocked', 'Blocked'],
+  ['backlog', 'Backlog'],
+  ['progress', 'Doing'],
+  ['review', 'Review'],
+  ['done', 'Done'],
 ];
 
-// status -> [data-stamp, data-stamp-wall, data-stamp-bp]
+// status -> [data-stamp, data-stamp-wall, data-stamp-bp]; backlog has none
 const STAMPS = {
   blocked: ['hold', 'held ✋', 'HOLD'],
   progress: ['wip', 'on it ✍', 'W.I.P.'],
   review: ['inspect', 'checking 👀', 'INSPECT'],
-  merged: ['merged', 'merged ✓', 'MERGED'],
   done: ['merged', 'merged ✓', 'MERGED'],
 };
 
@@ -1048,29 +1051,28 @@ function readStoredTheme() {
 function storeTheme(t) {
   try { localStorage.setItem('boardroom.theme', t); } catch { /* storage blocked — ignore */ }
 }
+function currentTheme() {
+  return document.body.dataset.theme === 'blueprint' ? 'blueprint' : 'wall';
+}
 
 function applyTheme(theme) {
   const t = theme === 'blueprint' ? 'blueprint' : 'wall';
-  document.body.setAttribute('data-theme', t);
+  document.body.dataset.theme = t;
   const btn = document.getElementById('themeToggle');
-  btn.textContent = t === 'wall' ? '⇄ BLUEPRINT MODE' : '⇄ SPRINT WALL MODE';
+  btn.textContent = t === 'blueprint' ? '⇄ SPRINT WALL MODE' : '⇄ BLUEPRINT MODE';
   btn.setAttribute('aria-pressed', String(t === 'blueprint'));
   renderTitle();
-  renderBoard();          // empty hints differ per theme
-}
-
-function currentTheme() {
-  return document.body.getAttribute('data-theme') === 'blueprint' ? 'blueprint' : 'wall';
+  if (currentData) { renderHeader(currentData); renderBoard(); }  // flavour text + empty hints differ
 }
 
 function renderTitle() {
   const name = currentData && currentData.project ? currentData.project.name : 'boardroom';
-  document.querySelector('h1.proj').textContent = currentTheme() === 'wall'
-    ? `${name} — sprint wall`
-    : `${name} — Construction Board`;
+  document.querySelector('.proj').textContent = currentTheme() === 'blueprint'
+    ? `${name} — Construction Board`
+    : `${name} — sprint wall`;
 }
 
-/* ---------- rendering ---------- */
+/* ---------- helpers ---------- */
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -1078,28 +1080,37 @@ function el(tag, cls, text) {
   if (text != null) n.textContent = text;
   return n;
 }
+// <b>value</b> segments, like the demo's .meta markup
+function bold(text) { return el('b', null, text); }
+
+/* ---------- rendering ---------- */
 
 function renderHeader(d) {
   const p = d.project;
-  const bits = [p.methodology, p.phase, `round ${p.round}/${p.maxRounds}`,
-                `${p.activeWorktrees} worktrees`];
+  const meta = document.querySelector('.meta');
+  meta.textContent = '';
+  meta.appendChild(bold(p.methodology || '—'));
+  meta.append(` · ${p.phase || '—'} · round `);
+  meta.appendChild(bold(`${p.round}/${p.maxRounds}`));
+  meta.append(' · ');
+  meta.appendChild(bold(String(p.activeWorktrees)));
+  meta.append(' worktrees active');
   if (p.sprintRunning) {
-    bits.push(currentTheme() === 'wall'
-      ? '⌁ sprint running'
-      : `GOOD SERVICE — ROUND ${p.round}/${p.maxRounds}`);
+    meta.append(currentTheme() === 'blueprint'
+      ? ` · GOOD SERVICE — ROUND ${p.round}/${p.maxRounds}`
+      : ' · ⌁ sprint running');
   }
-  document.querySelector('span.meta').textContent = bits.filter(Boolean).join(' · ');
 
   const openQuestions = d.cards.filter(c => c.questionFor === 'human').length;
-  const gate = document.querySelector('span.gate');
+  const gate = document.querySelector('.gate');
   if (openQuestions > 0) {
-    gate.setAttribute('data-attention', 'true');
+    gate.dataset.attention = 'true';
     gate.textContent = `needs you: ${openQuestions} question${openQuestions === 1 ? '' : 's'}`;
   } else if (!p.sprintRunning && p.awaitingHuman) {
-    gate.setAttribute('data-attention', 'true');
+    gate.dataset.attention = 'true';
     gate.textContent = `paused — waiting on you · ${p.nextGate}`;
   } else {
-    gate.removeAttribute('data-attention');
+    delete gate.dataset.attention;
     gate.textContent = `next gate: ${p.nextGate}`;
   }
 }
@@ -1134,11 +1145,12 @@ function renderTeam(d) {
   for (const m of d.team || []) {
     const s = el('span', 'member');
     s.dataset.agent = m.id;
-    if (m.busy) s.dataset.busy = 'true';
+    if (m.busy) s.setAttribute('data-busy', '');       // bare attribute, matches [data-busy]
     if (m.color) s.style.setProperty('--note', m.color);
     s.appendChild(el('span', 'face', (m.name || m.id || '?').trim().charAt(0).toUpperCase()));
     s.appendChild(el('b', null, m.name || m.id));
-    s.appendChild(el('small', null, m.busy ? `${m.role} · ${m.currentTask}` : m.role));
+    s.append(' ');
+    s.appendChild(el('small', null, m.busy && m.currentTask ? `${m.role} · ${m.currentTask}` : m.role));
     host.appendChild(s);
   }
 }
@@ -1159,10 +1171,9 @@ function cardNode(c, byId) {
 
   a.appendChild(el('span', 'tid', c.id));
   a.appendChild(el('h3', 'ttl', c.title));
-
-  const who = c.reviewerName ? `${c.assigneeName || c.assignee} → ${c.reviewerName}`
-                             : (c.assigneeName || c.assignee || 'unassigned');
-  a.appendChild(el('div', 'who', who));
+  a.appendChild(el('div', 'who', c.reviewerName
+    ? `${c.assigneeName || c.assignee} → ${c.reviewerName}`
+    : (c.assigneeName || c.assignee || 'unassigned')));
 
   if (c.dod && c.dod.total > 0) {
     const pct = Math.round((c.dod.done / c.dod.total) * 100);
@@ -1179,7 +1190,9 @@ function cardNode(c, byId) {
 
   a.tabIndex = 0;
   a.addEventListener('click', () => openOverlay(c));
-  a.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openOverlay(c); } });
+  a.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openOverlay(c); }
+  });
   return a;
 }
 
@@ -1211,7 +1224,10 @@ function renderFeed(d) {
     const t = document.createElement('time');
     t.textContent = a.time;
     row.appendChild(t);
-    row.appendChild(el('span', null, `${a.agent} — ${a.text}`));
+    const s = el('span');
+    s.appendChild(el('b', null, a.agent));
+    s.append(` · ${a.text}`);
+    row.appendChild(s);
     host.appendChild(row);
   }
 }
@@ -1221,16 +1237,16 @@ function renderTitleBlock(d) {
   const host = document.getElementById('titleblock');
   host.textContent = '';
   const rows = [
-    ['PROJECT', p.name],
+    ['PROJECT', String(p.name || '').toUpperCase()],
     ['ROUND', `${p.round} / ${p.maxRounds}`],
-    ['PARALLEL', String(p.parallelism)],
+    ['PARALLEL', `${p.activeWorktrees} WORKTREES`],
     ['APPROVED BY', d.cards.some(c => c.questionFor === 'human') ? 'PENDING — YOU' : 'AUTO'],
   ];
   for (const [k, v] of rows) {
-    const r = el('div', 'tb-row');
-    r.appendChild(el('b', null, k));
-    r.appendChild(el('span', null, v));
-    host.appendChild(r);
+    const cell = el('div');
+    cell.appendChild(el('small', null, k));
+    cell.appendChild(el('b', null, v));
+    host.appendChild(cell);
   }
 }
 
@@ -1244,11 +1260,14 @@ function openOverlay(c) {
     `status: ${c.status} · assignee: ${c.assigneeName || c.assignee || 'unassigned'}` +
     `${c.reviewerName ? ' · reviewer: ' + c.reviewerName : ''} · priority: ${c.priority}`));
   if (c.branch) body.appendChild(el('p', null, `branch: ${c.branch}`));
-  if (c.dependsOn && c.dependsOn.length) body.appendChild(el('p', null, `depends on: ${c.dependsOn.join(', ')}`));
+  if (c.dependsOn && c.dependsOn.length) {
+    body.appendChild(el('p', null, `depends on: ${c.dependsOn.join(', ')}`));
+  }
   if (c.question) body.appendChild(el('p', null, `question (${c.questionFor}): ${c.question}`));
-  if (c.dod && c.dod.total) body.appendChild(el('p', null, `definition of done: ${c.dod.done} of ${c.dod.total} complete`));
-  const ov = document.getElementById('overlay');
-  ov.hidden = false;
+  if (c.dod && c.dod.total) {
+    body.appendChild(el('p', null, `definition of done: ${c.dod.done} of ${c.dod.total} complete`));
+  }
+  document.getElementById('overlay').hidden = false;
   document.getElementById('overlayClose').focus();
 }
 
@@ -1257,11 +1276,11 @@ function closeOverlay() { document.getElementById('overlay').hidden = true; }
 /* ---------- polling ---------- */
 
 function showError(message) {
-  document.body.setAttribute('data-state', 'error');
-  document.querySelector('span.meta').textContent = message;
-  document.getElementById('board').textContent = '';
-  const p = el('p', 'empty', "can't find the board — is the sprint folder present?");
-  document.getElementById('board').appendChild(p);
+  document.body.dataset.state = 'error';
+  document.querySelector('.meta').textContent = message;
+  const board = document.getElementById('board');
+  board.textContent = '';
+  board.appendChild(el('p', 'empty', "can't find the board — is the sprint folder present?"));
 }
 
 async function poll() {
@@ -1272,8 +1291,8 @@ async function poll() {
     const d = await r.json();
     if (!d.project) throw new Error(d.error || 'no projects found');
 
-    document.body.removeAttribute('data-state');
-    if (d.revision === lastRevision) return;     // nothing changed — no repaint
+    delete document.body.dataset.state;
+    if (d.revision === lastRevision) return;      // unchanged — no repaint
     lastRevision = d.revision;
     currentData = d;
     selectedProject = d.project.id;
@@ -1322,7 +1341,7 @@ Create `sdlc-team/scripts/web/theme.css` with exactly this content (Tasks 5 and 
 Run: `node --test sdlc-team/scripts/tests/dashboard.test.js`
 Expected: PASS — `fail 0`. The page test now finds `data-theme=` and `themeToggle`; `/app.js` and `/theme.css` return 200 with the right content types.
 
-- [ ] **Step 5: Verify the rendered DOM against a real board**
+- [ ] **Step 5: Verify the payload and DOM hooks against a real board**
 
 Run:
 ```bash
@@ -1334,200 +1353,188 @@ const b=await (await fetch("http://127.0.0.1:"+p+"/board.json")).json();
 console.log("project:", b.project && b.project.name);
 console.log("cards:", b.cards.length, "team:", b.team.length, "activity:", b.activity.length);
 console.log("statuses:", [...new Set(b.cards.map(c=>c.status))].join(","));
-console.log("revision:", b.revision.slice(0,12));
+const html=await (await fetch("http://127.0.0.1:"+p+"/")).text();
+for (const t of ["data-theme=\"wall\"","themeToggle","class=\"rail\"","id=\"titleblock\"","id=\"overlay\"","ACTIVITY — INBOX / ARCHIVE"])
+  console.log(html.includes(t)?"ok  ":"MISS", t);
 s.close();});'
 ```
-Expected: prints a real project name, non-zero card/team counts, statuses drawn only from `blocked,backlog,progress,review,done`, and a 12-char revision prefix.
+Expected: a real project name, non-zero counts, statuses only from `blocked,backlog,progress,review,done`, and every markup token `ok`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add sdlc-team/scripts/web/index.html sdlc-team/scripts/web/app.js sdlc-team/scripts/web/theme.css
-git commit -m "feat(dashboard): add themed DOM skeleton and client renderer"
+git commit -m "feat(dashboard): add demo-accurate DOM skeleton and client renderer"
 ```
 
 ---
 
-### Task 5: Sprint Wall theme (layout + default theme)
+### Task 5: Shared layout + Sprint Wall theme
 
 **Files:**
 - Modify: `sdlc-team/scripts/web/theme.css`
 
+**Reference:** the CSS below is ported from `boardroom-dashboard-demo.html`'s `<style>` block — its "SHARED STRUCTURE" and "THEME: SPRINT WALL" sections, values unchanged. Four deliberate adaptations, each required by this project and marked in the CSS with a comment:
+
+1. **Agent colours come from `--note`,** not from six hardcoded `[data-agent="marcus"]` rules. The roster is composed per project, so the demo's per-name rules cannot work; Task 2 assigns each agent one of the demo's six colours and Task 4 sets it as an inline `--note`. Same palette, same result, any role.
+2. **Body becomes a CSS grid with a rail column** so §8's project rail has somewhere to live. The demo is block flow and has no rail. Every inner padding is kept at the demo's exact values, and below 1100px the rail is hidden — at which point the layout is the demo's.
+3. **The activity rows are `.feed .row`,** not `.feed div`. The demo's selector would also style the `#feedRows` wrapper; scoping to `.row` yields identical visuals.
+4. **Added, because the demo has no reference for them:** the rail, the card overlay, `.empty` hints, `.gate[data-attention]`, and focus rings.
+
 **Interfaces:**
-- Consumes: the §3 DOM hooks produced by Task 4 (`.hdr`, `.rail`, `.ptab`, `.team`, `.member`, `.face`, `.board`, `.col`, `.card`, `.tid`, `.ttl`, `.who`, `.dod`, `.bar > i`, `.q`, `.empty`, `.feed`, `.row`, `.titleblock`, `.overlay`, `.sheet`, `#themeToggle`, `[data-attention]`, `--note` custom property, `data-stamp-wall`).
-- Produces, for Task 6: the shared layout (grid areas, breakpoints, overlay, reduced-motion block) that Blueprint reuses, plus every `body[data-theme="wall"]` rule. Task 6 only adds `body[data-theme="blueprint"]` rules — it must not restructure layout.
+- Consumes: the DOM hooks produced by Task 4.
+- Produces, for Task 6: the shared layout (grid areas, breakpoints, overlay, reduced-motion block) that Blueprint reuses unchanged, plus every `body[data-theme="wall"]` rule. Task 6 adds only `body[data-theme="blueprint"]` rules and must not touch layout.
 
 - [ ] **Step 1: Write the shared layout and the Wall theme**
 
 Replace the whole contents of `sdlc-team/scripts/web/theme.css` with:
 
 ```css
-/* ============ shared layout (theme-agnostic) ============ */
-*, *::before, *::after { box-sizing: border-box; }
+/* ============================================================
+   SHARED STRUCTURE (ported from the demo; theme-agnostic)
+   ============================================================ */
+*{margin:0;box-sizing:border-box}
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 210px 1fr;
-  grid-template-areas: "rail hdr" "rail team" "rail board" "rail feed";
-  grid-template-rows: auto auto 1fr auto;
-  transition: background-color .3s ease, color .3s ease;
+/* ADAPTATION 2: grid instead of the demo's block flow, to seat the project rail. */
+body{
+  min-height:100vh;transition:background .3s;
+  display:grid;grid-template-columns:214px 1fr;
+  grid-template-areas:"rail hdr" "rail team" "rail board" "rail feed" "rail tblock";
+  grid-template-rows:auto auto 1fr auto auto;
+}
+.hdr{grid-area:hdr;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;padding:24px 32px 6px}
+.rail{grid-area:rail;padding:24px 14px;overflow-y:auto}
+.team{grid-area:team;display:flex;gap:12px;padding:10px 32px 4px;flex-wrap:wrap}
+.board{grid-area:board;display:grid;grid-template-columns:repeat(5,1fr);gap:16px;padding:18px 28px 30px;align-items:start}
+.feed{grid-area:feed;margin:0 32px 30px;padding:12px 18px}
+.titleblock{grid-area:tblock;display:none}
+
+.meta{font-size:12.5px}
+.gate{margin-left:auto}
+.toggle{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.08em;padding:8px 16px;border-radius:6px;border:2px solid}
+#railSelect{display:none;font:inherit;font-size:12px;padding:5px}
+
+.rail h4{font-size:11px;letter-spacing:.18em;margin-bottom:10px;opacity:.75}
+.ptab{display:block;width:100%;text-align:left;cursor:pointer;font:inherit;margin-bottom:9px;padding:8px 11px}
+.ptab b{display:block;font-size:13px}
+.ptab small{display:block;font-size:10.5px;opacity:.72}
+
+.member{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:4px 12px 4px 5px}
+.face{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:15px;font-weight:700}
+.member small{font-weight:600;font-size:10px;opacity:.7}
+.member[data-busy]::after{content:"▸ working";font-size:9.5px;font-weight:800;margin-left:2px}
+
+.col h2{font-size:18px;margin-bottom:14px}
+.col h2 span{font-size:13px;opacity:.6;margin-left:6px}
+.card{position:relative;padding:13px 14px 12px;margin-bottom:16px;cursor:pointer;transition:transform .15s}
+.tid{font-size:10px;font-weight:800;letter-spacing:.1em;opacity:.6}
+.ttl{font-size:16px;line-height:1.15;margin:3px 0 7px;font-weight:700}
+.who{font-size:11px;font-weight:800}
+.dod{margin-top:7px;font-size:10.5px;font-weight:700;opacity:.75}
+.dod .bar{height:4px;border-radius:2px;margin-top:4px;overflow:hidden;background:rgba(0,0,0,.14)}
+.dod .bar i{display:block;height:100%}
+.q{font-size:11.5px;font-weight:700;border-radius:4px;padding:6px 8px;margin-top:7px;line-height:1.4}
+.card[data-stamp]::after{position:absolute;bottom:8px;right:9px;font-size:13px;padding:0 7px;border:2px solid;border-radius:3px;transform:rotate(-7deg)}
+.card[data-status="done"] .ttl{text-decoration:line-through;opacity:.6}
+
+.feed h4{font-size:11px;letter-spacing:.18em;margin-bottom:8px;opacity:.75}
+/* ADAPTATION 3: scoped to .row so the #feedRows wrapper isn't styled as a row. */
+.feed .row{display:flex;gap:14px;font-size:12px;padding:3px 0}
+.feed time{opacity:.55;min-width:44px}
+
+/* ADDED (no demo reference): empty hints, overlay, focus rings */
+.empty{font-size:13px;opacity:.55;margin-top:4px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:20px;z-index:50}
+.overlay[hidden]{display:none}
+.sheet{position:relative;max-width:560px;width:100%;max-height:80vh;overflow-y:auto;padding:20px 22px}
+.sheet h3{margin-bottom:10px}
+.sheet p{margin:6px 0;font-size:13px;line-height:1.45}
+.x{position:absolute;top:8px;right:10px;cursor:pointer;font-size:20px;line-height:1;background:none;border:0;color:inherit}
+.card:focus-visible,.ptab:focus-visible,.toggle:focus-visible,.x:focus-visible,#railSelect:focus-visible{outline:3px solid #4C9AFF;outline-offset:2px}
+
+/* ============================================================
+   THEME: SPRINT WALL
+   ============================================================ */
+body[data-theme="wall"]{
+  font-family:'Nunito',sans-serif;color:#2E2A26;
+  background:radial-gradient(circle at 30% 20%,#E9E4DC 0%,#DFD8CC 100%);
+}
+body[data-theme="wall"] .proj{font-family:'Caveat',cursive;font-size:44px;transform:rotate(-1.2deg)}
+body[data-theme="wall"] .meta{color:#8A8177;font-weight:600}
+body[data-theme="wall"] .meta b{color:#2E2A26}
+body[data-theme="wall"] .gate{font-family:'Caveat',cursive;font-size:20px;background:#fff;padding:6px 16px;border-radius:4px;box-shadow:2px 3px 8px rgba(0,0,0,.12);transform:rotate(1.5deg);border-left:6px solid #FFD2A6}
+body[data-theme="wall"] .gate[data-attention="true"]{border-left-color:#B33A3A;color:#B33A3A;font-weight:700}
+body[data-theme="wall"] .toggle{background:#2E2A26;color:#F5EFE4;border-color:#2E2A26;font-family:'Nunito',sans-serif}
+body[data-theme="wall"] .member{background:#fff;border-radius:20px;box-shadow:1px 2px 5px rgba(0,0,0,.12)}
+body[data-theme="wall"] .face{font-family:'Caveat',cursive}
+body[data-theme="wall"] .member[data-busy]::after{color:#3E8E5A}
+
+/* ADAPTATION 1: palette arrives as --note (set inline per agent), replacing the
+   demo's six hardcoded [data-agent="name"] rules — the roster is dynamic. */
+body[data-theme="wall"] .face{background:var(--note,#FFD2A6);color:#2E2A26}
+body[data-theme="wall"] .card{background:var(--note,#FFE87A);color:#2E2A26}
+
+body[data-theme="wall"] .rail{border-right:2px dashed rgba(0,0,0,.09)}
+body[data-theme="wall"] .rail h4{font-family:'Caveat',cursive;font-size:17px;letter-spacing:0}
+body[data-theme="wall"] .ptab{background:#fff;color:#2E2A26;border:1px solid rgba(0,0,0,.14);border-radius:3px 10px 10px 3px;box-shadow:1px 2px 5px rgba(0,0,0,.12);font-family:'Nunito',sans-serif}
+body[data-theme="wall"] .ptab[data-active="true"]{border-left:4px solid #B07A1F;font-weight:800}
+
+body[data-theme="wall"] .col{border-right:2px dashed rgba(0,0,0,.09);padding:0 10px}
+body[data-theme="wall"] .col:last-child{border-right:0}
+body[data-theme="wall"] .col h2{font-family:'Caveat',cursive;font-size:24px;text-align:center;width:max-content;margin:0 auto 18px;background:rgba(255,255,255,.85);padding:2px 22px;transform:rotate(-1deg);box-shadow:1px 2px 4px rgba(0,0,0,.1)}
+body[data-theme="wall"] .card{max-width:215px;margin-left:auto;margin-right:auto;box-shadow:2px 5px 9px rgba(0,0,0,.18)}
+body[data-theme="wall"] .card::before{content:"";position:absolute;top:-7px;left:50%;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#B33A3A 60%);box-shadow:0 2px 3px rgba(0,0,0,.3)}
+body[data-theme="wall"] .card:nth-of-type(odd){transform:rotate(-1.8deg)}
+body[data-theme="wall"] .card:nth-of-type(even){transform:rotate(1.6deg)}
+body[data-theme="wall"] .card:hover{transform:scale(1.05) rotate(0);z-index:3}
+body[data-theme="wall"] .ttl{font-family:'Caveat',cursive;font-size:20px;font-weight:700}
+body[data-theme="wall"] .card[data-priority="high"] .tid::after{content:" 🔥"}
+body[data-theme="wall"] .dod .bar i{background:#3E8E5A}
+body[data-theme="wall"] .q{background:rgba(255,255,255,.6)}
+body[data-theme="wall"] .q::before{content:"❓ "}
+body[data-theme="wall"] .card[data-stamp]::after{content:attr(data-stamp-wall);font-family:'Caveat',cursive;color:#3E8E5A;border-color:#3E8E5A}
+body[data-theme="wall"] .card[data-stamp="hold"]::after{color:#B33A3A;border-color:#B33A3A}
+body[data-theme="wall"] .card[data-stamp="inspect"]::after{color:#B07A1F;border-color:#B07A1F}
+body[data-theme="wall"] .feed{background:rgba(255,255,255,.9);border-radius:10px;box-shadow:1px 2px 6px rgba(0,0,0,.08)}
+body[data-theme="wall"] .feed b{font-weight:800}
+body[data-theme="wall"] .empty{font-family:'Caveat',cursive;font-size:17px}
+body[data-theme="wall"] .sheet{background:#fff;color:#2E2A26;border-radius:4px;box-shadow:3px 8px 20px rgba(0,0,0,.3)}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width:1100px){
+  /* rail hidden -> layout matches the demo's block-flow proportions */
+  body{grid-template-columns:1fr;grid-template-areas:"hdr" "team" "board" "feed" "tblock"}
+  .rail{display:none}
+  #railSelect{display:inline-block}
+  .board{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:640px){
+  .board{grid-template-columns:1fr}
+  .hdr{padding:18px 16px 6px}
+  .team{padding:10px 16px 4px}
+  .board{padding:14px 14px 24px}
+  .feed{margin:0 16px 24px}
+  body[data-theme="wall"] .col{border-right:0}
 }
 
-.hdr   { grid-area: hdr; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 20px; }
-.rail  { grid-area: rail; padding: 14px 12px; overflow-y: auto; }
-.team  { grid-area: team; display: flex; flex-wrap: wrap; gap: 10px; padding: 4px 20px 12px; }
-.board { grid-area: board; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; padding: 6px 20px 18px; align-items: start; }
-.feed  { grid-area: feed; margin: 0 20px 18px; padding: 10px 14px; }
-
-.hdr h1.proj { margin: 0; font-size: 26px; line-height: 1.1; }
-.hdr .meta, .hdr .gate { font-size: 13px; }
-#themeToggle { margin-left: auto; cursor: pointer; font: inherit; font-size: 12px; padding: 7px 12px; }
-#railSelect { display: none; font: inherit; font-size: 12px; padding: 5px; }
-
-.rail h4, .feed h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
-.ptab { display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; margin-bottom: 8px; padding: 8px 10px; }
-.ptab b { display: block; font-size: 14px; }
-.ptab small { display: block; font-size: 11px; opacity: .75; }
-
-.member { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; }
-.member b { font-size: 13px; }
-.member small { font-size: 11px; opacity: .8; }
-.face { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--note, #ddd); color: #2E2A26; }
-
-.col h2 { margin: 0 0 12px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
-.col h2 .count { font-size: 12px; opacity: .8; }
-
-.card { position: relative; padding: 12px 12px 10px; margin-bottom: 14px; cursor: pointer; }
-.card .tid { font-size: 11px; font-weight: 700; letter-spacing: .06em; }
-.card .ttl { margin: 4px 0 6px; font-size: 16px; line-height: 1.25; }
-.card .who { font-size: 12px; opacity: .85; }
-.card .dod { margin-top: 8px; font-size: 11px; }
-.card .bar { height: 4px; margin-top: 4px; background: rgba(0,0,0,.16); }
-.card .bar i { display: block; height: 100%; background: currentColor; }
-.card .q { margin: 8px 0 0; font-size: 12px; line-height: 1.35; }
-.card:focus-visible, .ptab:focus-visible, #themeToggle:focus-visible, .x:focus-visible { outline: 3px solid #4C9AFF; outline-offset: 2px; }
-.empty { font-size: 13px; opacity: .55; margin: 4px 0 0; }
-
-.feed .row { display: flex; gap: 10px; padding: 4px 0; font-size: 12px; }
-.feed .row time { opacity: .7; flex: 0 0 42px; }
-
-.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 20px; z-index: 50; }
-.overlay[hidden] { display: none; }
-.sheet { position: relative; max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 20px 22px; }
-.sheet h3 { margin: 0 0 10px; }
-.sheet p { margin: 6px 0; font-size: 13px; line-height: 1.45; }
-.x { position: absolute; top: 8px; right: 10px; cursor: pointer; font-size: 20px; line-height: 1; background: none; border: 0; color: inherit; }
-
-.titleblock { display: none; }
-
-/* ============ Sprint Wall ============ */
-body[data-theme="wall"] {
-  --ink: #2E2A26; --dim: #8A8177;
-  --ok: #3E8E5A; --alarm: #B33A3A; --warn: #B07A1F;
-  background: radial-gradient(circle at 30% 20%, #E9E4DC, #DFD8CC);
-  color: var(--ink);
-  font-family: "Nunito", sans-serif;
-}
-body[data-theme="wall"] h1.proj,
-body[data-theme="wall"] .col h2,
-body[data-theme="wall"] .card .ttl,
-body[data-theme="wall"] .rail h4,
-body[data-theme="wall"] .feed h4 { font-family: "Caveat", cursive; font-weight: 700; }
-body[data-theme="wall"] h1.proj { font-size: 34px; }
-body[data-theme="wall"] .meta { color: var(--dim); font-weight: 600; }
-
-body[data-theme="wall"] .gate { color: var(--dim); }
-body[data-theme="wall"] .gate[data-attention="true"] {
-  color: var(--alarm); font-weight: 800; background: #fff;
-  border: 2px solid var(--alarm); border-radius: 3px; padding: 3px 8px;
-}
-body[data-theme="wall"] #themeToggle {
-  background: #fff; color: var(--ink); border: 1px solid rgba(0,0,0,.22);
-  border-radius: 3px; font-weight: 700; font-family: "Nunito", sans-serif;
-}
-
-/* project rail: white paper tabs */
-body[data-theme="wall"] .ptab {
-  background: #fff; color: var(--ink); border: 1px solid rgba(0,0,0,.14);
-  border-radius: 3px 10px 10px 3px; box-shadow: 1px 2px 5px rgba(0,0,0,.12);
-  font-family: "Nunito", sans-serif;
-}
-body[data-theme="wall"] .ptab[data-active="true"] { border-left: 4px solid var(--warn); font-weight: 800; }
-
-body[data-theme="wall"] .member {
-  background: var(--note, #fff); color: var(--ink);
-  border-radius: 20px; box-shadow: 1px 2px 4px rgba(0,0,0,.14);
-}
-body[data-theme="wall"] .member[data-busy="true"] b::after { content: " ⌁"; color: var(--ok); }
-
-/* column headers: painter's tape */
-body[data-theme="wall"] .col h2 {
-  background: #fff; color: var(--ink); padding: 5px 12px; transform: rotate(-1deg);
-  box-shadow: 1px 2px 4px rgba(0,0,0,.14); font-size: 21px;
-}
-body[data-theme="wall"] .col + .col { border-left: 2px dashed rgba(0,0,0,.14); padding-left: 14px; }
-
-/* cards: sticky notes with a push-pin */
-body[data-theme="wall"] .card {
-  background: var(--note, #FFE87A); color: var(--ink);
-  box-shadow: 2px 5px 9px rgba(0,0,0,.18); border-radius: 2px;
-  padding-top: 18px; transition: transform .18s ease, box-shadow .18s ease;
-}
-body[data-theme="wall"] .card::before {
-  content: ""; position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
-  width: 11px; height: 11px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #E8635F, #A32620);
-  box-shadow: 0 1px 2px rgba(0,0,0,.35);
-}
-body[data-theme="wall"] .card:nth-of-type(odd)  { transform: rotate(-1.8deg); }
-body[data-theme="wall"] .card:nth-of-type(even) { transform: rotate(1.6deg); }
-body[data-theme="wall"] .card:hover { transform: rotate(0deg) scale(1.05); box-shadow: 3px 8px 14px rgba(0,0,0,.24); z-index: 2; }
-body[data-theme="wall"] .card[data-priority="high"] .tid::after { content: " 🔥"; }
-body[data-theme="wall"] .card[data-stamp]::after {
-  content: attr(data-stamp-wall); position: absolute; right: 8px; bottom: 6px;
-  font-family: "Caveat", cursive; font-weight: 700; font-size: 15px; color: var(--ok);
-}
-body[data-theme="wall"] .card[data-stamp="hold"]::after    { color: var(--alarm); }
-body[data-theme="wall"] .card[data-stamp="inspect"]::after { color: var(--warn); }
-body[data-theme="wall"] .card .q {
-  background: #fff; border-left: 3px solid var(--alarm); padding: 5px 7px; color: var(--ink);
-}
-body[data-theme="wall"] .empty { font-family: "Caveat", cursive; font-size: 17px; }
-
-body[data-theme="wall"] .feed {
-  background: #fff; border-radius: 10px; box-shadow: 1px 2px 6px rgba(0,0,0,.12); color: var(--ink);
-}
-body[data-theme="wall"] .sheet { background: #fff; color: var(--ink); border-radius: 4px; box-shadow: 3px 8px 20px rgba(0,0,0,.3); }
-
-/* ============ responsive ============ */
-@media (max-width: 1100px) {
-  body { grid-template-columns: 1fr; grid-template-areas: "hdr" "team" "board" "feed"; }
-  .rail { display: none; }
-  #railSelect { display: inline-block; }
-  .board { grid-template-columns: repeat(2, 1fr); }
-  body[data-theme="wall"] .col + .col { border-left: 0; padding-left: 0; }
-}
-@media (max-width: 640px) {
-  .board { grid-template-columns: 1fr; }
-  .hdr { padding: 12px 14px; }
-  .board, .team { padding-left: 14px; padding-right: 14px; }
-  .feed { margin-left: 14px; margin-right: 14px; }
-}
-
-/* ============ reduced motion ============ */
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+  body[data-theme="wall"] .proj,
+  body[data-theme="wall"] .gate,
+  body[data-theme="wall"] .col h2,
   body[data-theme="wall"] .card,
   body[data-theme="wall"] .card:nth-of-type(odd),
   body[data-theme="wall"] .card:nth-of-type(even),
-  body[data-theme="wall"] .card:hover { transform: none; }
-  body[data-theme="wall"] .col h2 { transform: none; }
+  body[data-theme="wall"] .card:hover{transform:none}
 }
 ```
 
-- [ ] **Step 2: Confirm the CSS is served and syntactically sane**
+- [ ] **Step 2: Verify the CSS parses and carries the demo's exact values**
 
 Run:
 ```bash
@@ -1536,20 +1543,23 @@ const fs=require("fs");
 const css=fs.readFileSync("sdlc-team/scripts/web/theme.css","utf8");
 const open=(css.match(/{/g)||[]).length, close=(css.match(/}/g)||[]).length;
 console.log("braces balanced:", open===close, open, close);
-for (const t of ["data-theme=\"wall\"","#E9E4DC","2px 5px 9px rgba(0,0,0,.18)","-1.8deg","1.6deg","Caveat","prefers-reduced-motion","max-width: 1100px","max-width: 640px"])
-  console.log(css.includes(t) ? "ok  " : "MISS", t);'
+const need=["radial-gradient(circle at 30% 20%,#E9E4DC 0%,#DFD8CC 100%)","2px 5px 9px rgba(0,0,0,.18)",
+"rotate(-1.8deg)","rotate(1.6deg)","scale(1.05) rotate(0)","max-width:215px","top:-7px",
+"radial-gradient(circle at 35% 30%,#fff,#B33A3A 60%)","rotate(-1.2deg)","rotate(1.5deg)",
+"font-size:44px","transform:rotate(-1deg)","content:\" 🔥\"","content:\"❓ \"",
+"attr(data-stamp-wall)","var(--note,#FFE87A)","transform:rotate(-7deg)",
+"text-decoration:line-through","prefers-reduced-motion","max-width:1100px","max-width:640px"];
+for (const t of need) console.log(css.includes(t)?"ok  ":"MISS", t);'
 ```
 Expected: `braces balanced: true` and every token `ok`.
 
-- [ ] **Step 3: Compare against the demo**
-
-Open `boardroom-dashboard-demo.html` (repo root) and the live dashboard side by side in a browser:
+- [ ] **Step 3: Compare against the demo in a browser**
 
 ```bash
 node sdlc-team/scripts/dashboard.js --port 8787
 ```
 
-Visit `http://localhost:8787` in Wall theme. Check against the demo: sticky-note fills, the red pin, alternating rotations and the hover flatten, tape column headers, the dashed dividers, 🔥 on high-priority ids, the handwritten empty hint, the white feed strip. Fix any divergence — the demo wins on visuals.
+Open `http://localhost:8787` (Wall) beside `boardroom-dashboard-demo.html`. Check each demo signature: sticky-note fills from the palette, the pin above each card's top edge, alternating ∓ rotations and the hover flatten-and-scale, centred tape column headers at −1°, the 44px handwritten title at −1.2°, the tilted white gate note, dashed column dividers, 🔥 on high-priority ids, ❓ before question text, the strike-through on Done titles, stamps bottom-right at −7°, and the white rounded feed. Fix any divergence — **the demo wins on visuals.**
 
 - [ ] **Step 4: Run every suite**
 
@@ -1565,7 +1575,7 @@ Expected: `fail 0`; both shell suites all `ok:`.
 
 ```bash
 git add sdlc-team/scripts/web/theme.css
-git commit -m "feat(dashboard): add layout and Sprint Wall theme"
+git commit -m "feat(dashboard): port demo layout and Sprint Wall theme"
 ```
 
 ---
@@ -1575,116 +1585,89 @@ git commit -m "feat(dashboard): add layout and Sprint Wall theme"
 **Files:**
 - Modify: `sdlc-team/scripts/web/theme.css`
 
+**Reference:** ported from `boardroom-dashboard-demo.html`'s "THEME: BLUEPRINT" section, values unchanged. Additions where the demo has no reference: the rail (`SHEET INDEX`), the overlay, `.empty`, and `.gate[data-attention]`.
+
 **Interfaces:**
-- Consumes: the shared layout and DOM hooks from Task 5 — including `--note`, `data-stamp-bp`, `[data-attention]`, `.titleblock`/`.tb-row`, `.empty`, `.ptab[data-active]`, `.member[data-busy]`.
-- Produces: `body[data-theme="blueprint"]` rules only. It must not change any shared-layout rule (no grid/breakpoint edits) — otherwise toggling themes would jump the layout, which the acceptance criteria forbid.
+- Consumes: the shared layout and DOM hooks from Tasks 4–5 — `--note`, `data-stamp-bp`, `[data-attention]`, `.titleblock > div > small + b`, `.empty`, `.ptab[data-active]`, `.member[data-busy]`, `.feed .row`.
+- Produces: `body[data-theme="blueprint"]` rules only. It must not modify any shared-layout or responsive rule — otherwise toggling themes would shift the layout, which §9 forbids.
 
 - [ ] **Step 1: Append the Blueprint theme**
 
-Insert this block into `sdlc-team/scripts/web/theme.css` **immediately before** the `/* ============ responsive ============ */` section (so the media queries still win):
+Insert this block into `sdlc-team/scripts/web/theme.css` **immediately before** the `/* ==== RESPONSIVE ==== */` section, so the media queries still win:
 
 ```css
-/* ============ Blueprint ============ */
-body[data-theme="blueprint"] {
-  --ink: #E8F0FF; --dim: #9DB4E0;
-  --ok: #7CE3A9; --warn: #FFD37A; --alarm: #FF9C8F;
-  --line: rgba(214,228,255,.55);
-  --grid: rgba(214,228,255,.16);
-  background-color: #10366F;
-  background-image:
-    repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 24px),
-    repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px 24px),
-    linear-gradient(135deg, #123C7A, #0E3168);
-  color: var(--ink);
-  font-family: "IBM Plex Mono", monospace;
+/* ============================================================
+   THEME: BLUEPRINT
+   ============================================================ */
+body[data-theme="blueprint"]{
+  --lineW:rgba(214,228,255,.55);--lineF:rgba(214,228,255,.16);--ok:#7CE3A9;--warn:#FFD37A;--alarm:#FF9C8F;
+  font-family:'IBM Plex Mono',monospace;color:#E8F0FF;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 23px,var(--lineF) 23px 24px),
+    repeating-linear-gradient(90deg,transparent 0 23px,var(--lineF) 23px 24px),
+    linear-gradient(135deg,#123C7A 0%,#0E3168 100%);
 }
-body[data-theme="blueprint"] h1.proj,
-body[data-theme="blueprint"] .col h2,
-body[data-theme="blueprint"] .card .ttl,
-body[data-theme="blueprint"] .rail h4,
-body[data-theme="blueprint"] .feed h4,
-body[data-theme="blueprint"] .titleblock,
-body[data-theme="blueprint"] #themeToggle {
-  font-family: "Oswald", sans-serif; text-transform: uppercase; letter-spacing: .12em;
-}
-body[data-theme="blueprint"] h1.proj { font-weight: 600; font-size: 24px; letter-spacing: .25em; }
-body[data-theme="blueprint"] .col h2 { font-weight: 500; font-size: 14px; letter-spacing: .18em; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
-body[data-theme="blueprint"] .meta { color: var(--dim); }
-body[data-theme="blueprint"] .gate { color: var(--dim); }
-body[data-theme="blueprint"] .gate[data-attention="true"] { color: var(--warn); font-weight: 600; }
-body[data-theme="blueprint"] #themeToggle {
-  background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 0; font-size: 11px;
-}
+body[data-theme="blueprint"] .proj{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+body[data-theme="blueprint"] .meta{color:#9DB4E0;letter-spacing:.1em;text-transform:uppercase;font-size:10.5px}
+body[data-theme="blueprint"] .meta b{color:#E8F0FF}
+body[data-theme="blueprint"] .gate{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;border:1px dashed var(--lineW);padding:6px 14px;color:var(--warn)}
+body[data-theme="blueprint"] .gate[data-attention="true"]{border-style:solid;border-color:var(--alarm);color:var(--alarm)}
+body[data-theme="blueprint"] .toggle{background:transparent;color:#E8F0FF;border-color:var(--lineW);font-family:'Oswald',sans-serif;letter-spacing:.15em;text-transform:uppercase;border-radius:0}
 
-/* rail: SHEET INDEX panel */
-body[data-theme="blueprint"] .rail { border-right: 1px solid var(--line); }
-body[data-theme="blueprint"] .rail h4::after { content: " — sheet index"; }
-body[data-theme="blueprint"] .ptab {
-  background: rgba(9,34,74,.55); color: var(--ink); border: 1px solid var(--line);
-  border-radius: 0; font-family: "IBM Plex Mono", monospace;
-}
-body[data-theme="blueprint"] .ptab[data-active="true"] { border-left: 3px solid var(--ok); }
+/* ADDED (no demo reference): rail as a SHEET INDEX panel */
+body[data-theme="blueprint"] .rail{border-right:1px solid var(--lineW)}
+body[data-theme="blueprint"] .rail h4{font-family:'Oswald',sans-serif;letter-spacing:.25em}
+body[data-theme="blueprint"] .rail h4::after{content:" — SHEET INDEX"}
+body[data-theme="blueprint"] .ptab{background:rgba(9,34,74,.55);color:#E8F0FF;border:1px solid var(--lineW);border-radius:0;font-family:'IBM Plex Mono',monospace}
+body[data-theme="blueprint"] .ptab b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+body[data-theme="blueprint"] .ptab small{color:#9DB4E0;letter-spacing:.08em}
+body[data-theme="blueprint"] .ptab[data-active="true"]{border-left:3px solid var(--ok)}
 
-/* crew manifest: bordered strip, dashed separators, no avatars */
-body[data-theme="blueprint"] .team {
-  border: 1px solid var(--line); margin: 0 20px 12px; padding: 8px 0; gap: 0;
-  flex-wrap: nowrap; overflow-x: auto;
-}
-body[data-theme="blueprint"] .member { padding: 4px 14px; white-space: nowrap; }
-body[data-theme="blueprint"] .member + .member { border-left: 1px dashed var(--line); }
-body[data-theme="blueprint"] .face { display: none; }
-body[data-theme="blueprint"] .member[data-busy="true"] small::after { content: " ▸ RUNNING"; color: var(--ok); font-weight: 600; }
+body[data-theme="blueprint"] .team{border:1px solid var(--lineW);margin:14px 32px 0;padding:0;width:max-content;gap:0}
+body[data-theme="blueprint"] .member{border-right:1px dashed var(--lineF);padding:8px 16px;border-radius:0;background:none;box-shadow:none}
+body[data-theme="blueprint"] .member:last-child{border-right:0}
+body[data-theme="blueprint"] .face{display:none}
+body[data-theme="blueprint"] .member b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+body[data-theme="blueprint"] .member small{letter-spacing:.12em;text-transform:uppercase;color:#9DB4E0}
+body[data-theme="blueprint"] .member[data-busy]::after{content:"▸ RUNNING";color:var(--ok)}
 
-/* cards: spec sheets */
-body[data-theme="blueprint"] .card {
-  background: rgba(9,34,74,.55); color: var(--ink);
-  border: 1px solid var(--line); border-radius: 0; box-shadow: none;
-  padding-top: 12px; transform: none;
-}
-body[data-theme="blueprint"] .card::before { content: none; }
-body[data-theme="blueprint"] .card:hover { transform: none; border-color: var(--ink); }
-body[data-theme="blueprint"] .card .ttl { font-size: 14px; font-weight: 500; letter-spacing: .1em; }
-body[data-theme="blueprint"] .card .tid { color: var(--dim); }
-body[data-theme="blueprint"] .card[data-priority="high"] .tid::after { content: " ⚑ HIGH"; color: var(--warn); }
-body[data-theme="blueprint"] .card .bar { background: rgba(214,228,255,.18); }
-body[data-theme="blueprint"] .card[data-stamp]::after {
-  content: attr(data-stamp-bp); position: absolute; top: 8px; right: 8px;
-  transform: rotate(-7deg); font-family: "Oswald", sans-serif; font-size: 10px;
-  letter-spacing: .18em; padding: 2px 6px; border: 2px solid var(--ok); color: var(--ok);
-}
-body[data-theme="blueprint"] .card[data-stamp="hold"]::after    { border-color: var(--alarm); color: var(--alarm); }
-body[data-theme="blueprint"] .card[data-stamp="inspect"]::after { border-color: var(--warn); color: var(--warn); }
-body[data-theme="blueprint"] .card[data-stamp="wip"]::after     { border-color: var(--ink); color: var(--ink); }
+body[data-theme="blueprint"] .col{border-top:1px solid var(--lineW);border-right:0;padding:10px 0 0}
+body[data-theme="blueprint"] .col h2{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.2em;text-transform:uppercase;background:none;box-shadow:none;transform:none;width:auto;margin:0 0 14px;padding:0;text-align:left}
+body[data-theme="blueprint"] .card{background:rgba(9,34,74,.55);border:1px solid var(--lineW);border-radius:0;box-shadow:none;max-width:none;transform:none;color:#E8F0FF}
+body[data-theme="blueprint"] .card::before{content:none}
+body[data-theme="blueprint"] .card:hover{transform:translateY(-2px)}
+body[data-theme="blueprint"] .tid{color:#9DB4E0}
+body[data-theme="blueprint"] .ttl{font-family:'Oswald',sans-serif;font-size:14.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+body[data-theme="blueprint"] .who{color:#9DB4E0;letter-spacing:.1em;text-transform:uppercase;font-size:9.5px}
+body[data-theme="blueprint"] .who::before{content:"crew: "}
+body[data-theme="blueprint"] .card[data-priority="high"] .tid::after{content:" · PRI-A";color:var(--warn)}
+body[data-theme="blueprint"] .dod{color:#9DB4E0}
+body[data-theme="blueprint"] .dod .bar{background:rgba(214,228,255,.15);border-radius:0}
+body[data-theme="blueprint"] .dod .bar i{background:var(--ok)}
+body[data-theme="blueprint"] .q{color:var(--alarm);background:rgba(255,156,143,.07);border-left:2px solid var(--alarm);border-radius:0}
+body[data-theme="blueprint"] .q::before{content:"RFI → HUMAN: ";letter-spacing:.1em}
+body[data-theme="blueprint"] .card[data-stamp]::after{content:attr(data-stamp-bp);font-family:'Oswald',sans-serif;letter-spacing:.14em;top:8px;bottom:auto;border-radius:0}
+body[data-theme="blueprint"] .card[data-stamp="merged"]::after{color:var(--ok);border-color:var(--ok)}
+body[data-theme="blueprint"] .card[data-stamp="hold"]::after{color:var(--alarm);border-color:var(--alarm)}
+body[data-theme="blueprint"] .card[data-stamp="inspect"]::after{color:var(--warn);border-color:var(--warn)}
+body[data-theme="blueprint"] .card[data-stamp="wip"]::after{color:#E8F0FF;border-color:#E8F0FF;opacity:.7}
+body[data-theme="blueprint"] .feed{border:1px solid var(--lineW);background:rgba(9,34,74,.85);border-radius:0;box-shadow:none}
+body[data-theme="blueprint"] .feed h4{font-family:'Oswald',sans-serif;letter-spacing:.25em}
+body[data-theme="blueprint"] .feed .row{color:#9DB4E0}
+body[data-theme="blueprint"] .feed time{color:#E8F0FF}
 
-/* blocked question renders as an RFI callout */
-body[data-theme="blueprint"] .card .q {
-  border-left: 2px solid var(--alarm); padding: 4px 8px; background: rgba(255,156,143,.08); color: var(--ink);
-}
-body[data-theme="blueprint"] .card .q::before {
-  content: "RFI → HUMAN: "; font-family: "Oswald", sans-serif; letter-spacing: .1em; color: var(--alarm);
-}
-body[data-theme="blueprint"] .empty {
-  border: 1px dashed var(--line); padding: 10px; text-align: center;
-  font-family: "Oswald", sans-serif; letter-spacing: .14em; font-size: 11px; opacity: .8;
-}
+/* ADDED (no demo reference): dashed empty placeholder, overlay surface */
+body[data-theme="blueprint"] .empty{border:1px dashed var(--lineW);padding:10px;text-align:center;font-family:'Oswald',sans-serif;letter-spacing:.14em;font-size:11px;opacity:.85}
+body[data-theme="blueprint"] .sheet{background:#0E3168;color:#E8F0FF;border:1px solid var(--lineW);border-radius:0}
 
-/* revision-history feed */
-body[data-theme="blueprint"] .feed { border: 1px solid var(--line); }
-body[data-theme="blueprint"] .feed h4::after { content: " — revision history"; }
-body[data-theme="blueprint"] .feed .row { border-top: 1px dashed var(--line); padding: 5px 0; }
-
-/* drawing title block */
-body[data-theme="blueprint"] .titleblock {
-  display: block; position: fixed; right: 16px; bottom: 16px; z-index: 10;
-  border: 1px solid var(--line); background: rgba(9,34,74,.9); padding: 8px 10px; font-size: 10px;
-}
-body[data-theme="blueprint"] .tb-row { display: flex; gap: 10px; letter-spacing: .12em; }
-body[data-theme="blueprint"] .tb-row b { color: var(--dim); min-width: 78px; }
-
-body[data-theme="blueprint"] .sheet { background: #0E3168; color: var(--ink); border: 1px solid var(--line); border-radius: 0; }
+body[data-theme="blueprint"] .titleblock{display:grid;grid-template-columns:repeat(4,auto);width:max-content;margin:0 32px 30px auto;border:1px solid var(--lineW);background:rgba(9,34,74,.85)}
+body[data-theme="blueprint"] .titleblock div{padding:8px 16px;border-left:1px solid var(--lineF)}
+body[data-theme="blueprint"] .titleblock div:first-child{border-left:0}
+body[data-theme="blueprint"] .titleblock small{display:block;font-size:9px;letter-spacing:.18em;color:#9DB4E0}
+body[data-theme="blueprint"] .titleblock b{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.08em}
 ```
 
-- [ ] **Step 2: Verify both themes are present and layout rules were not touched**
+- [ ] **Step 2: Verify both themes are present, ordered, and demo-exact**
 
 Run:
 ```bash
@@ -1693,20 +1676,23 @@ const fs=require("fs");
 const css=fs.readFileSync("sdlc-team/scripts/web/theme.css","utf8");
 const open=(css.match(/{/g)||[]).length, close=(css.match(/}/g)||[]).length;
 console.log("braces balanced:", open===close);
-console.log("wall rules:", (css.match(/data-theme="wall"/g)||[]).length);
-console.log("blueprint rules:", (css.match(/data-theme="blueprint"/g)||[]).length);
-for (const t of ["#123C7A","rgba(214,228,255,.55)","rgba(9,34,74,.55)","Oswald","IBM Plex Mono","attr(data-stamp-bp)","RFI → HUMAN: ","rotate(-7deg)","sheet index","revision history","▸ RUNNING"])
-  console.log(css.includes(t) ? "ok  " : "MISS", t);
-console.log("blueprint before responsive:", css.indexOf("Blueprint ==") < css.indexOf("responsive =="));'
+console.log("wall rules:",(css.match(/data-theme="wall"/g)||[]).length,
+            "blueprint rules:",(css.match(/data-theme="blueprint"/g)||[]).length);
+const need=["linear-gradient(135deg,#123C7A 0%,#0E3168 100%)","rgba(214,228,255,.55)","rgba(9,34,74,.55)",
+"repeating-linear-gradient(0deg,transparent 0 23px","Oswald","IBM Plex Mono","attr(data-stamp-bp)",
+"content:\"RFI → HUMAN: \"","content:\"crew: \"","content:\" · PRI-A\"","content:\"▸ RUNNING\"",
+"SHEET INDEX","width:max-content","translateY(-2px)"];
+for (const t of need) console.log(css.includes(t)?"ok  ":"MISS", t);
+console.log("blueprint precedes responsive:", css.indexOf("THEME: BLUEPRINT") < css.indexOf("RESPONSIVE"));'
 ```
-Expected: braces balanced, both rule counts > 20, every token `ok`, and `blueprint before responsive: true`.
+Expected: braces balanced, both rule counts > 20, every token `ok`, `blueprint precedes responsive: true`.
 
 - [ ] **Step 3: Compare Blueprint against the demo in a browser**
 
 ```bash
 node sdlc-team/scripts/dashboard.js --port 8787
 ```
-Toggle to Blueprint at `http://localhost:8787` and compare with `boardroom-dashboard-demo.html`: drafting grid, 1px linework, square spec-sheet cards, rotated bordered stamps, the RFI callout, the bordered crew manifest with no avatars, REVISION HISTORY feed, and the bottom-right title block. Toggle back and forth and confirm **no layout jump** — only skin changes. Fix any divergence; the demo wins.
+Toggle to Blueprint and compare with the demo: the 24px drafting grid, 1px linework, the letter-spaced uppercase title, square spec-sheet cards with no pin, stamps top-right at −7°, `crew:` before the assignee, `· PRI-A` on high priority, the RFI callout, the bordered crew manifest with no avatars, the bordered feed, and the four-cell title block bottom-right. Then toggle back and forth several times and confirm **no layout jump** — only the skin changes. Fix any divergence; the demo wins.
 
 - [ ] **Step 4: Run every suite**
 
@@ -1722,7 +1708,7 @@ Expected: `fail 0`; both shell suites all `ok:`.
 
 ```bash
 git add sdlc-team/scripts/web/theme.css
-git commit -m "feat(dashboard): add Blueprint theme"
+git commit -m "feat(dashboard): port demo Blueprint theme"
 ```
 
 ---
@@ -1737,7 +1723,7 @@ git commit -m "feat(dashboard): add Blueprint theme"
 
 **Interfaces:**
 - Consumes: everything from Tasks 1–6.
-- Produces: a repo with exactly one dashboard UI (`scripts/web/`), documentation describing the two themes, and a green final sweep against the §9 acceptance criteria.
+- Produces: a repo with exactly one dashboard UI (`scripts/web/`), documentation describing the two themes, and a signed-off §9 acceptance walk.
 
 - [ ] **Step 1: Delete the superseded page**
 
@@ -1745,14 +1731,14 @@ git commit -m "feat(dashboard): add Blueprint theme"
 git rm sdlc-team/scripts/dashboard.html
 ```
 
-Confirm nothing still references it:
+Confirm nothing references it:
 
 ```bash
 grep -rn "dashboard.html" sdlc-team/ README.md || echo "no references — good"
 ```
-Expected: `no references — good`. (`dashboard.js` was already repointed at `web/index.html` in Task 3.)
+Expected: `no references — good`. (`dashboard.js` was repointed at `web/index.html` in Task 3.)
 
-- [ ] **Step 2: Update the plugin README dashboard section**
+- [ ] **Step 2: Update the plugin README**
 
 In `sdlc-team/README.md`, replace the `/sdlc-dashboard` table row with:
 
@@ -1768,7 +1754,7 @@ And add this section immediately after the "How it works" list:
 `/sdlc-dashboard` serves a read-only board at `http://localhost:8787` (Node.js ≥ 18, zero dependencies).
 It ships two themes over one DOM, switchable from the header and remembered in `localStorage`:
 
-- **Sprint Wall** (default) — sticky notes on a plaster wall, painter's-tape column headers, handwritten type.
+- **Sprint Wall** (default) — sticky notes pinned to a plaster wall, painter's-tape column headers, handwritten type.
 - **Blueprint** — drafting paper: grid, 1px linework, spec-sheet cards, RFI callouts, a drawing title block.
 
 The server converts `.sdlc/` markdown into a single `board.json` payload (`GET /board.json?project=<id>`);
@@ -1779,7 +1765,7 @@ the page polls it every 5 seconds and repaints only when the content hash change
 
 In `README.md`, replace the body of the `## Dashboard` section with:
 
-```markdown
+````markdown
 ```
 /sdlc-dashboard
 ```
@@ -1796,7 +1782,7 @@ Two themes over the same board, toggled from the header and remembered across re
 It is strictly **read-only**. It never writes to your projects.
 
 Projects register themselves at `/sdlc-init` (tracked in `~/.sdlc-team/projects.json`). Pass `--root <dir>` to also scan a workspace for boards created elsewhere.
-```
+````
 
 - [ ] **Step 4: Mention the themes in the command prompt**
 
@@ -1818,15 +1804,16 @@ bash sdlc-team/scripts/tests/test-inbox-validate.sh
 ```
 Expected: both validations pass; `fail 0`; both shell suites all `ok:`.
 
-Then, in a browser at `http://localhost:8787`, walk the §9 checklist and confirm each:
+Then in a browser at `http://localhost:8787`, walk the §9 checklist and confirm each:
 - Toggling themes restyles every surface with no layout jump.
 - Theme survives reload; clearing `localStorage` falls back to Wall.
-- Stopping the server (or pointing `--root` at an empty dir) shows the themed "can't find the board" state, not a blank page.
-- Counts, card positions, DoD bars, busy badges and the feed update within ~5s of editing a real `kanban.md`, with no flicker when nothing changed.
-- A card with `question(HUMAN):` is unmissable in both themes (red gate note / warn gate + `PENDING — YOU` in the title block).
-- Tab to the toggle, the rail and a card; Enter opens the overlay; Esc closes it.
-- At 640px width the board is one column and still usable.
-- With `prefers-reduced-motion: reduce` set in the OS/browser, cards sit flat and nothing animates.
+- Pointing `--root` at an empty directory (or stopping the server) shows the themed "can't find the board" state, not a blank page.
+- Counts, card positions, DoD bars, busy badges and the feed update within ~5s of editing a real `kanban.md`, with no repaint when nothing changed.
+- A card with `question(HUMAN):` is unmissable in both themes (red-bordered gate note / solid alarm gate + `PENDING — YOU` in the title block).
+- Tab reaches the toggle, the rail and cards; Enter opens the overlay; Esc closes it.
+- At 640px the board is one column and still usable.
+- With `prefers-reduced-motion: reduce`, cards sit flat and nothing animates.
+- Side by side with `boardroom-dashboard-demo.html`, each theme is visually indistinguishable for the same data.
 
 - [ ] **Step 6: Commit**
 
@@ -1846,21 +1833,27 @@ git push -u origin release/dashboard-ui-v2
 ## Self-Review
 
 **Spec coverage:**
-- §1 stack/serving/data-source/refresh/no-deps → Global Constraints + Tasks 3 (serving), 1–2 (markdown → JSON), 4 (5s poll, revision compare), 4 (font links + fallbacks).
-- §2 `board.json` contract → Task 2 (every field, including the derived ones), tested field-by-field.
-- §3 DOM skeleton + stamp attribute table → Task 4 (`index.html` + `cardNode`/`render*`), reused verbatim by Tasks 5–6.
-- §4.1 Wall tokens + signature details → Task 5. §4.2 Blueprint tokens + signature details → Task 6. Both verified token-by-token by the Step 2 greps and by demo comparison.
-- §5 rendering, empty states, blocked emphasis, card overlay, feed cap, sprint state → Task 4 (`renderBoard` empty hints, `renderHeader` attention state, `openOverlay`, `renderFeed` slice(0,8), sprintRunning indicator).
-- §6 toggle behavior, persistence, keyboard, reduced motion → Task 4 (`applyTheme`/`storeTheme`/try-catch) + Task 5 (focus ring, ≤300ms transition, reduced-motion block).
-- §7 breakpoints, contrast, semantics, CSS-disabled readability → Task 5 (media queries, `--ink` always `#2E2A26` on Wall notes, `section`/`h2`/`article`/`time` in Task 4's skeleton, document order in `index.html`).
-- §8 multi-project rail + `≤1100px` dropdown → Task 4 (`renderRail`, `#railSelect`), Task 5/6 rail styling, Task 5 media query.
-- §9 acceptance criteria → Task 7 Step 5 walks all eight.
-- §10 out of scope → recorded in Global Constraints; nothing in the plan builds them.
+- §1 stack / serving / data source / 5s refresh / no deps → Global Constraints + Task 3 (serving), Tasks 1–2 (markdown → JSON), Task 4 (poll + revision compare, font links with fallbacks).
+- §2 `board.json` contract → Task 2, tested field by field, including the five derived fields.
+- §3 DOM skeleton + stamp attribute table → Task 4, reproduced from the demo's markup and consumed verbatim by Tasks 5–6.
+- §4.1 Wall tokens and signature details → Task 5 (ported from the demo). §4.2 Blueprint → Task 6 (ported from the demo). Both verified by the Step 2 token greps plus a browser diff.
+- §5 rendering, empty states, blocked emphasis, overlay, feed cap, sprint state → Task 4.
+- §6 toggle, persistence, keyboard, reduced motion → Task 4 (`applyTheme` / `storeTheme` in try-catch) + Task 5 (focus rings, `.3s` transition, reduced-motion block).
+- §7 breakpoints, contrast, semantics, CSS-disabled readability → Task 5 media queries; Wall ink pinned to `#2E2A26` on notes and faces; `section`/`h2`/`article`/`time` in Task 4's markup; document order in `index.html`.
+- §8 rail + `≤1100px` dropdown → Task 4 (`renderRail`, `#railSelect`), Task 5/6 rail styling, Task 5 media query.
+- §9 acceptance criteria → Task 7 Step 5 walks all eight, demo parity included.
+- §10 out of scope → recorded in Global Constraints; nothing here builds them.
 
-**Placeholder scan:** none. Every step carries runnable code or an exact edit. The one deliberately-empty file (`theme.css` in Task 4 Step 3) is a one-line comment that Task 5 replaces wholesale, and it is labelled as such.
+**Placeholder scan:** none. Every step carries runnable code or an exact edit. The one intentionally-empty file (`theme.css` in Task 4 Step 3) is a labelled one-line comment that Task 5 replaces wholesale.
 
-**Type consistency:** `slugify` / `parseAgentRef` / `parseConfig` are defined in Task 1 and used with those exact signatures in Task 2. Task 2's `buildPayload(projectDirs, selectedId)` is called with that shape in Task 3. The card fields Task 2 emits (`status`, `assignee`, `assigneeName`, `reviewer`, `reviewerName`, `dod{done,total}`, `branch`, `dependsOn`, `question`, `questionFor`, `priority`) are exactly the ones Task 4's `cardNode`/`openOverlay` read. The DOM hooks Task 4 produces are exactly the selectors Tasks 5 and 6 style. Column keys are `blocked|backlog|progress|review|done` in Task 2, Task 4's `COLS`, and both stylesheets.
+**Type consistency:** `slugify` / `parseAgentRef` / `parseConfig` are defined in Task 1 and used with those signatures in Task 2. `buildPayload(projectDirs, selectedId)` from Task 2 is called with that shape in Task 3. The card fields Task 2 emits (`status`, `assignee`, `assigneeName`, `reviewer`, `reviewerName`, `dod{done,total}`, `branch`, `dependsOn`, `question`, `questionFor`, `priority`) are exactly what Task 4's `cardNode` / `openOverlay` read. Every selector Tasks 5–6 style is emitted by Task 4. Column keys are `blocked|backlog|progress|review|done` in Task 2, Task 4's `COLS`, and both stylesheets; the visible labels are the demo's `Blocked|Backlog|Doing|Review|Done`.
 
-**Known limitation, stated rather than hidden:** there are no automated tests for the client rendering or for the CSS — no DOM environment is available without adding a dependency, which the spec forbids. Logic worth testing was therefore pushed server-side into `board-json.js` (9 tests) and `parse.js`, and the client stays a thin renderer. Visual correctness rests on the Task 5/6 token greps plus the demo comparison in a real browser, and the `.claude/agents`-style acceptance walk in Task 7 Step 5.
+**Demo reconciliation (why Tasks 4–6 were rewritten):** the first draft of this plan was written from §4's token tables before the demo existed on disk. The demo then contradicted it in ~20 places, and the demo wins on visuals. Corrections now baked into the tasks: column header "Doing" (not "In Progress"); `.meta` values wrapped in `<b>`; column count as a bare `span` styled via `.col h2 span`; `data-busy` as a valueless attribute with `▸ working` / `▸ RUNNING` on `.member::after`; title block as four `div > small + b` cells (not `.tb-row`); stamps declared once in shared CSS at `rotate(-7deg)` with themes overriding position/colour; Wall cards `max-width:215px` centred; pin at `top:-7px` with the `#fff → #B33A3A` gradient; Wall `.col` divider as `border-right` with `:last-child` reset; `❓ ` prefix on Wall questions; `crew: ` prefix and `· PRI-A` in Blueprint; done titles struck through; feed rows as `<time>` + `<span><b>agent</b> · text</span>`; feed heading kept as the demo's `ACTIVITY — INBOX / ARCHIVE` (so §4.2's "REVISION HISTORY" wording is dropped — demo wins); Blueprint grid as `transparent 0 23px / lineF 23px 24px` repeating gradients.
 
-**Prerequisite:** `boardroom-dashboard-demo.html` must be present at the repo root before Task 5 — Tasks 5 and 6 both diff against it, and the §9 demo-parity criterion cannot be signed off without it.
+**Sanctioned divergences from the demo, and why:**
+1. Agent colours come from an inline `--note` (palette assigned by hash of agent id) instead of the demo's six `[data-agent="marcus"]` rules — the roster is composed per project, so per-name rules cannot work. Same six colours.
+2. `body` is a CSS grid with a rail column; the demo is block flow with no rail. Inner paddings match the demo exactly, and below 1100px the rail is hidden, so the layout is the demo's.
+3. Activity rows are scoped `.feed .row` rather than `.feed div`, so the `#feedRows` wrapper isn't styled as a row. Identical visuals.
+4. The rail, the card overlay, `.empty` hints, `.gate[data-attention]` and focus rings have no demo reference — §5, §8 and §9 govern them.
+
+**Known limitation, stated rather than hidden:** there are no automated tests for the client rendering or the CSS — a DOM environment would mean a dependency, which §1 forbids. Logic worth testing was therefore pushed server-side (`board-json.js`, 9 tests; `parse.js`, 9 tests), leaving the client a thin renderer. Visual correctness rests on the Task 5/6 token greps plus the browser diff against the demo in Tasks 5–7.
