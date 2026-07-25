@@ -9,7 +9,7 @@ Run this, forwarding any arguments the user passed (default port 8787):
 
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/dashboard.js" $ARGUMENTS`
 
-The server prints `http://localhost:<port>`. Open it in a browser: it lists every known SDLC project (most-recently-active first) and, per project, shows the team, the live kanban board, the inbox, and the archive — refreshing every few seconds. It is **read-only** and never modifies any project.
+The server prints `http://localhost:<port>`. Open it in a browser: it lists every known SDLC project (most-recently-active first) and, per project, shows the composed team, the live kanban board, and a recent-activity feed drawn from the archive — polling every 5 seconds. A header toggle switches between the **Sprint Wall** and **Blueprint** themes, and the choice is remembered. It is **read-only** and never modifies any project.
 
 Notes:
 - The server runs until stopped with Ctrl-C. If you need the session free while it runs, start it in the background (append `&`) and report the URL.

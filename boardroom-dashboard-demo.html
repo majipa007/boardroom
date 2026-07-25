@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>boardroom — Sprint Wall / Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800&family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   SHARED STRUCTURE (theme-agnostic layout skeleton)
+   ============================================================ */
+*{margin:0;box-sizing:border-box}
+body{min-height:100vh;transition:background .3s}
+.hdr{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;padding:24px 32px 6px}
+.meta{font-size:12.5px}
+.gate{margin-left:auto}
+.toggle{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.08em;padding:8px 16px;border-radius:6px;border:2px solid}
+.team{display:flex;gap:12px;padding:10px 32px 4px;flex-wrap:wrap}
+.member{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:4px 12px 4px 5px}
+.face{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:15px;font-weight:700}
+.member small{font-weight:600;font-size:10px;opacity:.7}
+.member[data-busy]::after{content:"▸ working";font-size:9.5px;font-weight:800;margin-left:2px}
+.board{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;padding:18px 28px 30px;align-items:start}
+.col h2{font-size:18px;margin-bottom:14px}
+.col h2 span{font-size:13px;opacity:.6;margin-left:6px}
+.card{position:relative;padding:13px 14px 12px;margin-bottom:16px;cursor:pointer;transition:transform .15s}
+.tid{font-size:10px;font-weight:800;letter-spacing:.1em;opacity:.6}
+.ttl{font-size:16px;line-height:1.15;margin:3px 0 7px;font-weight:700}
+.who{font-size:11px;font-weight:800}
+.dod{margin-top:7px;font-size:10.5px;font-weight:700;opacity:.75}
+.dod .bar{height:4px;border-radius:2px;margin-top:4px;overflow:hidden;background:rgba(0,0,0,.14)}
+.dod .bar i{display:block;height:100%}
+.q{font-size:11.5px;font-weight:700;border-radius:4px;padding:6px 8px;margin-top:7px;line-height:1.4}
+.card[data-stamp]::after{position:absolute;bottom:8px;right:9px;font-size:13px;padding:0 7px;border:2px solid;border-radius:3px;transform:rotate(-7deg)}
+.card[data-status="done"] .ttl{text-decoration:line-through;opacity:.6}
+.feed{margin:0 32px 30px;padding:12px 18px}
+.feed h4{font-size:11px;letter-spacing:.18em;margin-bottom:8px;opacity:.75}
+.feed div{display:flex;gap:14px;font-size:12px;padding:3px 0}
+.feed time{opacity:.55;min-width:44px}
+.titleblock{display:none}
+@media (max-width:1100px){.board{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:640px){.board{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ============================================================
+   THEME: SPRINT WALL
+   ============================================================ */
+body[data-theme="wall"]{
+  --marcus:#FFE87A;--elena:#FFB3C7;--jamey:#A8E6CF;--sofia:#C9B8F5;--dev:#AEDDF7;--priya:#FFD2A6;
+  font-family:'Nunito',sans-serif;color:#2E2A26;
+  background:radial-gradient(circle at 30% 20%,#E9E4DC 0%,#DFD8CC 100%);
+}
+body[data-theme="wall"] .proj{font-family:'Caveat',cursive;font-size:44px;transform:rotate(-1.2deg)}
+body[data-theme="wall"] .meta{color:#8A8177;font-weight:600}
+body[data-theme="wall"] .meta b{color:#2E2A26}
+body[data-theme="wall"] .gate{font-family:'Caveat',cursive;font-size:20px;background:#fff;padding:6px 16px;border-radius:4px;box-shadow:2px 3px 8px rgba(0,0,0,.12);transform:rotate(1.5deg);border-left:6px solid var(--priya)}
+body[data-theme="wall"] .toggle{background:#2E2A26;color:#F5EFE4;border-color:#2E2A26;font-family:'Nunito',sans-serif}
+body[data-theme="wall"] .member{background:#fff;border-radius:20px;box-shadow:1px 2px 5px rgba(0,0,0,.12)}
+body[data-theme="wall"] .face{font-family:'Caveat',cursive}
+body[data-theme="wall"] .member[data-busy]::after{color:#3E8E5A}
+body[data-theme="wall"] [data-agent="marcus"] .face,body[data-theme="wall"] .card[data-agent="marcus"]{background:var(--marcus)}
+body[data-theme="wall"] [data-agent="elena"] .face,body[data-theme="wall"] .card[data-agent="elena"]{background:var(--elena)}
+body[data-theme="wall"] [data-agent="jamey"] .face,body[data-theme="wall"] .card[data-agent="jamey"]{background:var(--jamey)}
+body[data-theme="wall"] [data-agent="sofia"] .face,body[data-theme="wall"] .card[data-agent="sofia"]{background:var(--sofia)}
+body[data-theme="wall"] [data-agent="dev"] .face,body[data-theme="wall"] .card[data-agent="dev"]{background:var(--dev)}
+body[data-theme="wall"] [data-agent="priya"] .face{background:var(--priya)}
+body[data-theme="wall"] .col{border-right:2px dashed rgba(0,0,0,.09);padding:0 10px}
+body[data-theme="wall"] .col:last-child{border-right:0}
+body[data-theme="wall"] .col h2{font-family:'Caveat',cursive;font-size:24px;text-align:center;width:max-content;margin:0 auto 18px;background:rgba(255,255,255,.85);padding:2px 22px;transform:rotate(-1deg);box-shadow:1px 2px 4px rgba(0,0,0,.1)}
+body[data-theme="wall"] .card{max-width:215px;margin-left:auto;margin-right:auto;box-shadow:2px 5px 9px rgba(0,0,0,.18)}
+body[data-theme="wall"] .card::before{content:"";position:absolute;top:-7px;left:50%;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#B33A3A 60%);box-shadow:0 2px 3px rgba(0,0,0,.3)}
+body[data-theme="wall"] .card:nth-of-type(odd){transform:rotate(-1.8deg)}
+body[data-theme="wall"] .card:nth-of-type(even){transform:rotate(1.6deg)}
+body[data-theme="wall"] .card:hover{transform:scale(1.05) rotate(0);z-index:3}
+body[data-theme="wall"] .ttl{font-family:'Caveat',cursive;font-size:20px;font-weight:700}
+body[data-theme="wall"] .card[data-priority="high"] .tid::after{content:" 🔥"}
+body[data-theme="wall"] .dod .bar i{background:#3E8E5A}
+body[data-theme="wall"] .q{background:rgba(255,255,255,.6)}
+body[data-theme="wall"] .q::before{content:"❓ "}
+body[data-theme="wall"] .card[data-stamp]::after{content:attr(data-stamp-wall);font-family:'Caveat',cursive;color:#3E8E5A;border-color:#3E8E5A}
+body[data-theme="wall"] .card[data-stamp="hold"]::after{color:#B33A3A;border-color:#B33A3A}
+body[data-theme="wall"] .card[data-stamp="inspect"]::after{color:#B07A1F;border-color:#B07A1F}
+body[data-theme="wall"] .feed{background:rgba(255,255,255,.9);border-radius:10px;box-shadow:1px 2px 6px rgba(0,0,0,.08)}
+body[data-theme="wall"] .feed b{font-weight:800}
+
+/* ============================================================
+   THEME: BLUEPRINT
+   ============================================================ */
+body[data-theme="blueprint"]{
+  --lineW:rgba(214,228,255,.55);--lineF:rgba(214,228,255,.16);--ok:#7CE3A9;--warn:#FFD37A;--alarm:#FF9C8F;
+  font-family:'IBM Plex Mono',monospace;color:#E8F0FF;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 23px,var(--lineF) 23px 24px),
+    repeating-linear-gradient(90deg,transparent 0 23px,var(--lineF) 23px 24px),
+    linear-gradient(135deg,#123C7A 0%,#0E3168 100%);
+}
+body[data-theme="blueprint"] .proj{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+body[data-theme="blueprint"] .meta{color:#9DB4E0;letter-spacing:.1em;text-transform:uppercase;font-size:10.5px}
+body[data-theme="blueprint"] .meta b{color:#E8F0FF}
+body[data-theme="blueprint"] .gate{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;border:1px dashed var(--lineW);padding:6px 14px;color:var(--warn)}
+body[data-theme="blueprint"] .toggle{background:transparent;color:#E8F0FF;border-color:var(--lineW);font-family:'Oswald',sans-serif;letter-spacing:.15em;text-transform:uppercase;border-radius:0}
+body[data-theme="blueprint"] .team{border:1px solid var(--lineW);margin:14px 32px 0;padding:0;width:max-content;gap:0}
+body[data-theme="blueprint"] .member{border-right:1px dashed var(--lineF);padding:8px 16px;border-radius:0}
+body[data-theme="blueprint"] .member:last-child{border-right:0}
+body[data-theme="blueprint"] .face{display:none}
+body[data-theme="blueprint"] .member b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+body[data-theme="blueprint"] .member small{letter-spacing:.12em;text-transform:uppercase;color:#9DB4E0}
+body[data-theme="blueprint"] .member[data-busy]::after{content:"▸ RUNNING";color:var(--ok)}
+body[data-theme="blueprint"] .col{border-top:1px solid var(--lineW);padding-top:10px}
+body[data-theme="blueprint"] .col h2{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.2em;text-transform:uppercase}
+body[data-theme="blueprint"] .card{background:rgba(9,34,74,.55);border:1px solid var(--lineW)}
+body[data-theme="blueprint"] .card:hover{transform:translateY(-2px)}
+body[data-theme="blueprint"] .tid{color:#9DB4E0}
+body[data-theme="blueprint"] .ttl{font-family:'Oswald',sans-serif;font-size:14.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+body[data-theme="blueprint"] .who{color:#9DB4E0;letter-spacing:.1em;text-transform:uppercase;font-size:9.5px}
+body[data-theme="blueprint"] .who::before{content:"crew: "}
+body[data-theme="blueprint"] .card[data-priority="high"] .tid::after{content:" · PRI-A";color:var(--warn)}
+body[data-theme="blueprint"] .dod{color:#9DB4E0}
+body[data-theme="blueprint"] .dod .bar{background:rgba(214,228,255,.15)}
+body[data-theme="blueprint"] .dod .bar i{background:var(--ok)}
+body[data-theme="blueprint"] .q{color:var(--alarm);background:rgba(255,156,143,.07);border-left:2px solid var(--alarm);border-radius:0}
+body[data-theme="blueprint"] .q::before{content:"RFI → HUMAN: ";letter-spacing:.1em}
+body[data-theme="blueprint"] .card[data-stamp]::after{content:attr(data-stamp-bp);font-family:'Oswald',sans-serif;letter-spacing:.14em;top:8px;bottom:auto;border-radius:0}
+body[data-theme="blueprint"] .card[data-stamp="merged"]::after{color:var(--ok);border-color:var(--ok)}
+body[data-theme="blueprint"] .card[data-stamp="hold"]::after{color:var(--alarm);border-color:var(--alarm)}
+body[data-theme="blueprint"] .card[data-stamp="inspect"]::after{color:var(--warn);border-color:var(--warn)}
+body[data-theme="blueprint"] .card[data-stamp="wip"]::after{color:#E8F0FF;border-color:#E8F0FF;opacity:.7}
+body[data-theme="blueprint"] .feed{border:1px solid var(--lineW);background:rgba(9,34,74,.85)}
+body[data-theme="blueprint"] .feed h4{font-family:'Oswald',sans-serif;letter-spacing:.25em}
+body[data-theme="blueprint"] .feed div{color:#9DB4E0}
+body[data-theme="blueprint"] .feed time{color:#E8F0FF}
+body[data-theme="blueprint"] .titleblock{display:grid;grid-template-columns:repeat(4,auto);width:max-content;margin:0 32px 30px auto;border:1px solid var(--lineW);background:rgba(9,34,74,.85)}
+body[data-theme="blueprint"] .titleblock div{padding:8px 16px;border-left:1px solid var(--lineF)}
+body[data-theme="blueprint"] .titleblock div:first-child{border-left:0}
+body[data-theme="blueprint"] .titleblock small{display:block;font-size:9px;letter-spacing:.18em;color:#9DB4E0}
+body[data-theme="blueprint"] .titleblock b{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.08em}
+</style>
+</head>
+<body data-theme="wall">
+
+<header class="hdr">
+  <h1 class="proj">splitmate — sprint wall</h1>
+  <span class="meta"><b>hybrid</b> · Implementation (Foundation) · round <b>3/20</b> · <b>3</b> worktrees active</span>
+  <span class="gate">next gate: sprint review after Foundation</span>
+  <button class="toggle" id="themeToggle" aria-pressed="false">⇄ BLUEPRINT MODE</button>
+</header>
+
+<section class="team" aria-label="Team">
+  <span class="member" data-agent="priya"><span class="face">P</span><b>Priya</b> <small>manager</small></span>
+  <span class="member" data-agent="marcus" data-busy><span class="face">M</span><b>Marcus</b> <small>backend</small></span>
+  <span class="member" data-agent="elena" data-busy><span class="face">E</span><b>Elena</b> <small>mobile</small></span>
+  <span class="member" data-agent="jamey" data-busy><span class="face">J</span><b>Jamey</b> <small>devops</small></span>
+  <span class="member" data-agent="sofia"><span class="face">S</span><b>Sofia</b> <small>security</small></span>
+  <span class="member" data-agent="dev"><span class="face">D</span><b>Dev</b> <small>qa</small></span>
+</section>
+
+<main class="board">
+  <section class="col" data-col="blocked">
+    <h2>Blocked<span>1</span></h2>
+    <article class="card" data-status="blocked" data-agent="marcus" data-priority="high" data-stamp="hold" data-stamp-wall="held ✋" data-stamp-bp="HOLD">
+      <span class="tid">T-006</span><h3 class="ttl">Authz + rate-limit middleware</h3>
+      <div class="who">Marcus</div>
+      <p class="q">Redis-backed rate limiting or in-memory for v1?</p>
+    </article>
+  </section>
+
+  <section class="col" data-col="backlog">
+    <h2>Backlog<span>5</span></h2>
+    <article class="card" data-agent="elena"><span class="tid">T-008</span><h3 class="ttl">Auth screens</h3><div class="who">Elena</div></article>
+    <article class="card" data-agent="sofia"><span class="tid">T-009</span><h3 class="ttl">Security baseline S1–S8</h3><div class="who">Sofia</div></article>
+    <article class="card" data-agent="dev"><span class="tid">T-010</span><h3 class="ttl">Test harness + coverage gate</h3><div class="who">Dev</div></article>
+    <article class="card" data-agent="marcus"><span class="tid">T-011</span><h3 class="ttl">Groups CRUD + invite codes</h3><div class="who">Marcus</div></article>
+    <article class="card" data-agent="jamey"><span class="tid">T-012</span><h3 class="ttl">Env & secrets pattern</h3><div class="who">Jamey</div></article>
+  </section>
+
+  <section class="col" data-col="progress">
+    <h2>Doing<span>3</span></h2>
+    <article class="card" data-status="progress" data-agent="marcus" data-priority="high" data-stamp="wip" data-stamp-wall="on it ✍" data-stamp-bp="W.I.P.">
+      <span class="tid">T-005</span><h3 class="ttl">Auth endpoints: register · login · refresh</h3><div class="who">Marcus</div>
+      <div class="dod">DoD 1/4 · sdlc/T-005-auth<div class="bar"><i style="width:25%"></i></div></div>
+    </article>
+    <article class="card" data-status="progress" data-agent="elena" data-stamp="wip" data-stamp-wall="on it ✍" data-stamp-bp="W.I.P.">
+      <span class="tid">T-007</span><h3 class="ttl">Expo scaffold + navigation</h3><div class="who">Elena</div>
+      <div class="dod">DoD 2/4 · sdlc/T-007-expo<div class="bar"><i style="width:50%"></i></div></div>
+    </article>
+    <article class="card" data-status="progress" data-agent="jamey" data-priority="high" data-stamp="wip" data-stamp-wall="on it ✍" data-stamp-bp="W.I.P.">
+      <span class="tid">T-003</span><h3 class="ttl">CI skeleton (Actions)</h3><div class="who">Jamey</div>
+      <div class="dod">DoD 1/3 · sdlc/T-003-ci<div class="bar"><i style="width:33%"></i></div></div>
+    </article>
+  </section>
+
+  <section class="col" data-col="review">
+    <h2>Review<span>1</span></h2>
+    <article class="card" data-status="review" data-agent="marcus" data-priority="high" data-stamp="inspect" data-stamp-wall="checking 👀" data-stamp-bp="INSPECT">
+      <span class="tid">T-002</span><h3 class="ttl">Docker + Postgres + Prisma</h3><div class="who">Marcus → Sofia</div>
+      <div class="dod">DoD 3/4 · security sign-off pending<div class="bar"><i style="width:75%"></i></div></div>
+    </article>
+  </section>
+
+  <section class="col" data-col="done">
+    <h2>Done<span>1</span></h2>
+    <article class="card" data-status="done" data-agent="marcus" data-stamp="merged" data-stamp-wall="merged ✓" data-stamp-bp="MERGED">
+      <span class="tid">T-001</span><h3 class="ttl">Monorepo scaffold</h3><div class="who">Marcus</div>
+      <div class="dod">DoD 4/4 · on main<div class="bar"><i style="width:100%"></i></div></div>
+    </article>
+  </section>
+</main>
+
+<footer class="feed" aria-label="Activity">
+  <h4>ACTIVITY — INBOX / ARCHIVE</h4>
+  <div><time>12:41</time><span><b>Marcus</b> · status update on T-005 · 6 files changed</span></div>
+  <div><time>12:39</time><span><b>Priya</b> · moved T-002 → Review · reviewer: Sofia</span></div>
+  <div><time>12:33</time><span><b>Priya</b> · merged T-001 to main</span></div>
+  <div><time>12:31</time><span><b>Elena</b> · started T-007 · worktree created</span></div>
+</footer>
+
+<div class="titleblock">
+  <div><small>PROJECT</small><b>SPLITMATE</b></div>
+  <div><small>ROUND</small><b>3 / 20</b></div>
+  <div><small>PARALLEL</small><b>3 WORKTREES</b></div>
+  <div><small>APPROVED BY</small><b>PENDING — YOU</b></div>
+</div>
+
+<script>
+(function(){
+  const btn = document.getElementById('themeToggle');
+  const proj = document.querySelector('.proj');
+  function apply(theme){
+    document.body.dataset.theme = theme;
+    const bp = theme === 'blueprint';
+    btn.textContent = bp ? '⇄ SPRINT WALL MODE' : '⇄ BLUEPRINT MODE';
+    btn.setAttribute('aria-pressed', String(bp));
+    proj.textContent = bp ? 'Splitmate — Construction Board' : 'splitmate — sprint wall';
+  }
+  btn.addEventListener('click', () => {
+    apply(document.body.dataset.theme === 'wall' ? 'blueprint' : 'wall');
+  });
+  // NOTE for implementation outside this demo: persist choice with
+  // localStorage.setItem('boardroom.theme', theme) and restore on load.
+  // Omitted here because this demo also runs in sandboxed previews.
+})();
+</script>
+</body>
+</html>

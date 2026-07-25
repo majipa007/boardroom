@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>boardroom — Sprint Wall / Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800&family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body data-theme="wall">
+
+<header class="hdr">
+  <h1 class="proj">boardroom</h1>
+  <span class="meta">loading…</span>
+  <span class="gate"></span>
+  <select id="railSelect" aria-label="Select project"></select>
+  <button class="toggle" id="themeToggle" type="button" aria-pressed="false">⇄ BLUEPRINT MODE</button>
+</header>
+
+<aside class="rail" aria-label="Projects">
+  <h4>PROJECTS</h4>
+  <div id="railList"></div>
+</aside>
+
+<section class="team" id="team" aria-label="Team"></section>
+
+<main class="board" id="board"></main>
+
+<footer class="feed" aria-label="Activity">
+  <h4>ACTIVITY — INBOX / ARCHIVE</h4>
+  <div id="feedRows"></div>
+</footer>
+
+<div class="titleblock" id="titleblock"></div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Card detail">
+    <button class="x" id="overlayClose" type="button" aria-label="Close">×</button>
+    <div id="overlayBody"></div>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
