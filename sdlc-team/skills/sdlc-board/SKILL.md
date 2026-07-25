@@ -37,29 +37,54 @@ Columns, in fixed order. Cards live under a column heading.
 
 ```markdown
 ### T-014 | Implement JWT refresh endpoint
-- assignee: Marcus
+- role: R-01 backend
+- verify-roles: [R-04 sec-review, R-05 qa-verify]
 - created-by: Manager
 - phase: Sprint 2
 - priority: high
 - depends-on: [T-011]
 - branch: sdlc/T-014-jwt-refresh          # set when work starts
-- flow: worktree → implement → tests → inbox report → Security Reviewer review → QA Engineer review → merge
 - what: |
     Add POST /auth/refresh. Rotate refresh tokens, invalidate old token,
     return new access+refresh pair. Follow existing error envelope in src/api/errors.ts.
 - definition-of-done:
   - [ ] Endpoint implemented and returns correct status codes (200/401/403)
-  - [ ] Unit + integration tests written and passing (QA Engineer verifies)
-  - [ ] No new high/critical findings (Security Reviewer signs off)
+  - [ ] Unit + integration tests written and passing (qa-verify verifies)
+  - [ ] No new high/critical findings (sec-review signs off)
   - [ ] Branch merges cleanly to main (Manager verifies)
 - status-log:
   - 2026-07-24T10:02 created by Manager
-  - 2026-07-24T10:31 Marcus started (worktree created)
 ```
 
 **Card rules:**
 - Task IDs are `T-###`, monotonically increasing, assigned only by the Manager.
 - A DoD checkbox may only be checked by the role that owns it: the QA Engineer owns test boxes, the Security Reviewer owns security boxes, the implementing worker owns implementation boxes, the Manager owns the merge box. Ownership is requested via inbox and applied by the Manager.
+
+## Risk classification → mandatory verify-roles
+
+When the Manager creates a card it tags the card's risk classes, and each class attaches a
+verify-role automatically. This is **mandatory and not staffing-dependent** — if the needed
+review role does not exist yet, the Manager mints it.
+
+| The card… | attaches |
+|---|---|
+| touches auth/authz, input parsing, secrets, dependencies, or file/network handling | `sec-review` |
+| produces or changes executable code | `qa-verify` |
+| changes infra or deployment | `infra-review` |
+
+**A card cannot move to Done until every role in its `verify-roles` has a sign-off message in
+`.sdlc/archive/`.** Sign-off means a `review-result` (or `dod-check` for `qa-verify`) message
+from that role reporting success.
+
+Separation of duties, enforced by the Manager:
+- The worker that implemented a card never verifies it — verification is always a fresh
+  `reviewer` spawn, even when the charters overlap.
+- The Manager never implements, edits code, or checks DoD boxes on its own authority.
+- A reported failing test run blocks the merge unconditionally; the Manager files a fix card.
+
+Legacy note: cards written before this upgrade use `- assignee: <name>` and no
+`verify-roles`. They still parse, and the Manager rewrites them to `role:` when it next
+touches them.
 
 ## Inbox protocol — `.sdlc/inbox/`
 
@@ -104,22 +129,49 @@ Git discipline (workers that write code): work only on branch `sdlc/<task-id>-<s
 
 DoD honesty: only ever *request* a DoD box check via inbox, and only for a box you have personally verified.
 
-## Dynamic team composition
+## The role registry
 
-The team is composed per project, not fixed. Three roles are always present and ship with the plugin:
+The team is a registry of ROLES, not a fixed roster of people. `.sdlc/team.md` holds one
+section per role, and **only the Manager writes it**:
 
-- **Manager / Orchestrator** (`manager`): the only writer of `kanban.md`; decomposes, assigns, merges, runs checkpoints, and **composes the rest of the team**.
-- **Security Reviewer** (`security-reviewer`): read-only reviewer; high/critical findings escalate.
-- **QA Engineer** (`qa-engineer`): tests only; verifies DoD and signs off.
+```markdown
+## R-01 · backend
+- charter: Owns server code: API routes, business logic, DB schema/migrations, server tests.
+- boundaries: Never edits mobile/web UI code, CI config, or deployment manifests.
+- conventions: |            # the role's accumulated memory — grows over time
+    zod for validation; error envelope in src/api/errors.ts.
+- default-tools: standard
+- status: active            # active | retired
+- minted: 2026-07-25 by Manager (init)
+- history: 6 cards completed, 1 rework
+```
 
-Every **implementation specialist** (backend, frontend, mobile, ML, data, infra, docs, …) is chosen by the Manager from the project brief and written as a project-level agent file under the target project's `.claude/agents/<slug>.md`, generated from `templates/worker-agent.md`. Rules the Manager follows when composing:
+Registry rules:
+- **IDs (`R-##`) are stable** and never reused. Cards reference a role by id AND name.
+- **Reuse before mint.** Scan the registry first; reuse or extend a role whose charter covers
+  at least what the card needs. Minting a near-duplicate is a defect.
+- **Charter edits beat new roles.** A role that keeps producing rework gets its
+  `conventions`/`charter` edited, not a replacement minted.
+- **Retire, never delete.** Set `status: retired`; the section stays so `archive/` history
+  still resolves.
+- Every registry change is an auto-decision: log it in the Decision Log, never stop for it.
 
-- Pick the smallest set of specialist roles the brief actually needs (skip frontend if there's no UI; add an ML engineer if there's a model; etc.). Manager, Security, and QA are always included.
-- Each specialist gets a unique lowercase-hyphen `name` (e.g. `ml-engineer`, `ios-developer`, `data-engineer`), a clear `Role`, and explicit owned / out-of-scope boundaries so roles don't overlap.
-- Record every team member (name + role) in `.sdlc/team.md` as a table row.
-- Generated agent files use `isolation: worktree`, `model: sonnet`, no `skills:` frontmatter (the body says "Load the `sdlc-board` skill"), and never reference `${CLAUDE_PLUGIN_ROOT}`.
+## Executing a role
 
-**Loading caveat:** Claude Code's watcher only picks up `.claude/agents/` if that directory existed when the session started. So `/sdlc-init` creates `.claude/agents/` and, if it was newly created, asks the user to restart once before `/sprint`. Adding a new specialist mid-project (into the already-watched directory) is hot-loaded within seconds — no restart.
+There are exactly three shipped agents: `manager`, `worker`, `reviewer`. A role is not an
+agent file — the Manager spawns `worker` (implementation) or `reviewer` (verification) and
+injects the charter, using this template:
+
+```
+You are acting as role <R-id name>.
+CHARTER: <charter>
+BOUNDARIES: <boundaries>
+CONVENTIONS: <conventions>
+Your card: <card-id>. Round: <n>. Report via inbox only.
+```
+
+`worker` and `reviewer` are separate definitions on purpose: implementation and verification
+must never share a prompt or a tool set.
 
 ## Templates
 
