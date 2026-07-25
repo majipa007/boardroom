@@ -106,7 +106,7 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 
 ## Notes for others
 - note(Elena): response shape for /auth/refresh documented in src/api/types.ts
-- note(Security Reviewer): please pay attention to token rotation logic in src/auth/refresh.ts
+- note(sec-review): please pay attention to token rotation logic in src/auth/refresh.ts
 
 ## New task proposals
 (none)
@@ -117,13 +117,13 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 - `proposed-task` messages contain a full draft card; the Manager decides whether it becomes a real card.
 - After processing, the Manager moves the file **unchanged** to `archive/` (`mv`, not rewrite). `archive/` is a replayable project history and MUST be committed.
 - `type: escalation` messages (e.g. a high/critical security finding) trigger an immediate human checkpoint.
-- **Delivering messages across worktrees.** A worker running in an isolated worktree (`isolation: worktree`) must **commit** its inbox message file onto its working branch — `git add .sdlc/inbox/<file>` then commit with a `[T-###]` message. Untracked files created inside a worktree are invisible to the manager, so an uncommitted inbox message is never delivered. A worker running in the main checkout (the Security Reviewer) instead writes the inbox file directly and does not commit it (the manager owns commits on the main branch).
+- **Delivering messages across worktrees.** Both `worker` and `reviewer` run with `isolation: worktree`, so they must **commit** the inbox message onto the working branch — `git add .sdlc/inbox/<file>` then a `[<card-id>]` commit. Untracked files created inside a worktree are invisible to the Manager, so an uncommitted inbox message is never delivered.
 
-## Common worker protocol (the Security Reviewer, the QA Engineer, and each project-composed specialist)
+## Common protocol for `worker` and `reviewer`
 
-Read `.sdlc/kanban.md`. Find cards assigned to you in Backlog or In Progress. Work the highest-priority unblocked one. **Never edit kanban.md.** Report everything via a new file in `.sdlc/inbox/` following the message schema above. If you are running in an isolated worktree, commit that inbox file onto your working branch (`git add` + `[T-###]` commit) so the manager can read it — uncommitted worktree files never reach the manager. If you are running in the main checkout, just write the file. If nothing is assigned to you, scan Review/notes for anything addressed to you; if still nothing, write a GENERAL inbox message saying you are idle and end your turn.
+Your spawn prompt gives you a role charter, its boundaries and conventions, and exactly ONE card id. Read `.sdlc/kanban.md` and that card in full, and work only that card. **Never edit `kanban.md` or `team.md`.** Report everything via a new file in `.sdlc/inbox/` following the message schema above, and commit it onto your working branch so the Manager receives it.
 
-Respect your role's hard boundaries (see `.sdlc/team.md`). If a card needs work outside your scope, do NOT do it — file a `proposed-task` so the Manager can route it, and note the dependency.
+Respect your role's boundaries (they come from the registry in `.sdlc/team.md`). If the card needs work outside your scope, do NOT do it — file a `question` or `proposed-task` so the Manager can route it, and note the dependency.
 
 Git discipline (workers that write code): work only on branch `sdlc/<task-id>-<slug>` created from `main`; prefix every commit with `[T-###]`; never commit to `main`.
 
