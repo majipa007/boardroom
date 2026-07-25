@@ -2,6 +2,12 @@
 description: One-line-per-agent standup synthesized from the board and recent archive.
 ---
 
-Read `.sdlc/team.md` (the composed roster), `.sdlc/kanban.md`, and the recent `.sdlc/archive/` messages. Modify nothing.
+Read `.sdlc/team.md` (the role registry), `.sdlc/kanban.md`, and the recent `.sdlc/archive/`
+messages. Modify nothing.
 
-For each team member listed in `.sdlc/team.md` (the Manager, the Security Reviewer, the QA Engineer, and this project's composed specialists), print exactly one line describing what they last finished and what they are starting next, e.g. `Backend Developer: finished T-014, starting T-016.` If a member has no recent activity, print `<Name>: idle.`
+For each **active role** in the registry, print exactly one line — what it last finished and
+what it is starting next, e.g. `R-01 backend: finished T-014, starting T-016.` If a role has
+no recent activity, print `R-## <name>: idle.` Retired roles are omitted.
+
+If the project still uses the legacy roster format (a markdown table rather than `R-##`
+sections), fall back to one line per listed member.
