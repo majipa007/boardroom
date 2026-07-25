@@ -228,7 +228,14 @@ Methodology changes how work is batched and where gates fall. The board and queu
 /sdlc-dashboard
 ```
 
-A zero-dependency local web UI at `http://localhost:8787` that watches **every** Boardroom project on your machine, most-recently-active first — and for each: the composed team, the live board, the inbox, and the archive. Refreshes every few seconds.
+A zero-dependency local web UI at `http://localhost:8787` that watches **every** Boardroom project on your machine, most-recently-active first — and for each: the composed team, the live board, the inbox, and the archive. It polls every 5 seconds and repaints only when something actually changed.
+
+Two themes over the same board, toggled from the header and remembered across reloads:
+
+| Theme | Looks like |
+|---|---|
+| **Sprint Wall** (default) | Sticky notes pinned to a plaster wall — painter's-tape column headers, handwritten titles, a 🔥 on high-priority cards |
+| **Blueprint** | Drafting paper — grid, 1px linework, square spec-sheet cards, rotated `HOLD`/`W.I.P.`/`INSPECT`/`MERGED` stamps, `RFI → HUMAN` callouts, and a drawing title block |
 
 It is strictly **read-only**. It never writes to your projects.
 

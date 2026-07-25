@@ -29,7 +29,7 @@ Requires **Node.js ≥ 18** for `/sdlc-dashboard` only; everything else is Markd
 | `/status` | Read-only board summary. |
 | `/standup` | One line per team member. |
 | `/sdlc-override <methodology\|key=value>` | Change methodology or config; the manager restructures the board and logs the decision. |
-| `/sdlc-dashboard [--port N] [--root DIR]` | Launch a read-only local web dashboard showing every project's board, team, inbox, and archive, newest-active first. |
+| `/sdlc-dashboard [--port N] [--root DIR]` | Launch the read-only local web dashboard — two themes (Sprint Wall / Blueprint), live board, team, inbox and archive for every project. |
 
 ## The team
 
@@ -52,6 +52,17 @@ Always present (ship with the plugin):
 - **Parallel, zero conflicts:** each worker runs in its own git worktree on branch `sdlc/<task-id>-<slug>`; the manager merges one branch at a time and turns conflicts into fix cards rather than resolving blindly.
 - **Definition of Done** lives on every card as checkboxes, each owned by the role responsible for it. A card reaches Done only when every box is checked.
 - **Checkpoints** halt the loop and ask you: plan approval, sprint/phase gate, high/critical security finding, blocked escalation, round cap. A Stop hook prevents the session ending with open cards unless `.sdlc/.awaiting-human` is set.
+
+## Dashboard
+
+`/sdlc-dashboard` serves a read-only board at `http://localhost:8787` (Node.js ≥ 18, zero dependencies).
+It ships two themes over one DOM, switchable from the header and remembered in `localStorage`:
+
+- **Sprint Wall** (default) — sticky notes pinned to a plaster wall, painter's-tape column headers, handwritten type.
+- **Blueprint** — drafting paper: grid, 1px linework, spec-sheet cards, RFI callouts, a drawing title block.
+
+The server converts `.sdlc/` markdown into a single `board.json` payload (`GET /board.json?project=<id>`);
+the page polls it every 5 seconds and repaints only when the content hash changes. The UI never writes to a project.
 
 ## Layout it manages in your project
 
