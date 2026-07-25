@@ -104,6 +104,23 @@ Git discipline (workers that write code): work only on branch `sdlc/<task-id>-<s
 
 DoD honesty: only ever *request* a DoD box check via inbox, and only for a box you have personally verified.
 
+## Dynamic team composition
+
+The team is composed per project, not fixed. Three roles are always present and ship with the plugin:
+
+- **Priya — Manager / Orchestrator** (`priya-manager`): the only writer of `kanban.md`; decomposes, assigns, merges, runs checkpoints, and **composes the rest of the team**.
+- **Sofia — Security** (`sofia-security`): read-only reviewer; high/critical findings escalate.
+- **Dev — QA** (`dev-qa`): tests only; verifies DoD and signs off.
+
+Every **implementation specialist** (backend, frontend, mobile, ML, data, infra, docs, …) is chosen by Priya from the project brief and written as a project-level agent file under the target project's `.claude/agents/<slug>.md`, generated from `templates/worker-agent.md`. Rules Priya follows when composing:
+
+- Pick the smallest set of specialist roles the brief actually needs (skip frontend if there's no UI; add an ML engineer if there's a model; etc.). Manager, Security, and QA are always included.
+- Each specialist gets a unique lowercase-hyphen `name` (e.g. `ml-engineer`, `ios-developer`, `data-engineer`), a clear `Role`, and explicit owned / out-of-scope boundaries so roles don't overlap.
+- Record every team member (name + role) in `.sdlc/team.md` as a table row.
+- Generated agent files use `isolation: worktree`, `model: sonnet`, no `skills:` frontmatter (the body says "Load the `sdlc-board` skill"), and never reference `${CLAUDE_PLUGIN_ROOT}`.
+
+**Loading caveat:** Claude Code's watcher only picks up `.claude/agents/` if that directory existed when the session started. So `/sdlc-init` creates `.claude/agents/` and, if it was newly created, asks the user to restart once before `/sprint`. Adding a new specialist mid-project (into the already-watched directory) is hot-loaded within seconds — no restart.
+
 ## Templates
 
 Starter files for a target project's `.sdlc/` live in `templates/`:
