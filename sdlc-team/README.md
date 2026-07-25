@@ -49,4 +49,4 @@ Commit `.sdlc/` — it is your project-management record.
 
 ## Non-goals (v1)
 
-Dynamic team composition, external integrations (GitHub/Slack/CI), Sofia writing fixes herself, multiple concurrent boards, token budgeting beyond the round cap.
+External integrations (GitHub/Slack/CI), Sofia writing fixes herself, multiple concurrent boards, token budgeting beyond the round cap.

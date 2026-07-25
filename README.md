@@ -12,7 +12,7 @@ Boardroom hosts the `sdlc-team` plugin. A manager agent decomposes work onto a b
 
 You give it a project brief. It:
 
-1. **Builds a team and a board.** Six personas with hard role boundaries, and a Kanban board (`.sdlc/kanban.md`) that is the single source of truth.
+1. **Composes a team and a board.** A project-specific roster — always a manager, security, and QA, plus the specialists your brief needs — each with hard role boundaries, and a Kanban board (`.sdlc/kanban.md`) that is the single source of truth.
 2. **Plans the work.** The manager picks an SDLC methodology (Agile / Kanban / Waterfall / Hybrid) from your brief, decomposes it into cards with a checkbox Definition of Done, and stops for your approval.
 3. **Ships code in rounds.** Each round: the manager updates the board, then specialist agents run **in parallel git worktrees**, each implementing one card and reporting back. The manager reviews, merges, and re‑plans.
 4. **Gates on humans where it matters.** Init approval, sprint/phase gates, high‑severity security findings, blocked cards, and a round cap all halt the loop and ask you.
@@ -123,7 +123,7 @@ Run `/sdlc-dashboard` to launch a zero‑dependency local web UI (default `http:
 
 ## Non‑goals (v1)
 
-Dynamic team composition, external integrations (GitHub Issues / Slack / CI providers), Sofia fixing code herself, multiple concurrent boards per repo, and token budgeting beyond the round cap.
+External integrations (GitHub Issues / Slack / CI providers), Sofia fixing code herself, multiple concurrent boards per repo, and token budgeting beyond the round cap.
 
 ---
 
