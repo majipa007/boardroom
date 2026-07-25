@@ -1,7 +1,7 @@
 'use strict';
 const crypto = require('crypto');
 const path = require('path');
-const { parseProject, slugify, parseAgentRef } = require('./parse');
+const { parseProject, slugify, parseAgentRef, parseRoleRef } = require('./parse');
 
 const STATUS_BY_COLUMN = {
   'Blocked': 'blocked',
@@ -55,6 +55,12 @@ function numOr(value, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function firstSentence(text) {
+  const s = String(text || '').trim();
+  const m = s.match(/^(.*?[.!?])(\s|$)/);
+  return (m ? m[1] : s).slice(0, 90);
+}
+
 function hashPayload(payload) {
   return crypto.createHash('sha1')
     .update(JSON.stringify({ ...payload, revision: undefined }))
@@ -67,12 +73,18 @@ function buildBoardJson(projectDir) {
   const cards = [];
   for (const [column, status] of Object.entries(STATUS_BY_COLUMN)) {
     for (const c of p.board[column] || []) {
+      // The grouping/colour key is the stable role id when the card uses the registry,
+      // otherwise the slugified legacy assignee id — so old boards keep working.
+      const roleKey = c.roleId || c.roleName ? (c.roleId || slugify(c.roleName)) : (c.assigneeId || '');
       cards.push({
         id: c.id,
         title: c.title,
         status,
-        assignee: c.assigneeId || '',
-        assigneeName: c.assigneeName || '',
+        role: roleKey,
+        roleName: c.roleName || c.assigneeName || '',
+        assignee: roleKey,                 // alias, kept for one version
+        assigneeName: c.assigneeName || c.roleName || '',
+        verifyRoles: c.verifyRoles || [],
         priority: normalizePriority(c.priority),
         question: c.question || '',
         questionFor: c.questionFor || '',
@@ -87,20 +99,38 @@ function buildBoardJson(projectDir) {
   }
 
   const inProgress = cards.filter(c => c.status === 'progress');
-  const busyBy = new Map(inProgress.map(c => [c.assignee, c.id]));
+  const busyBy = new Map(inProgress.map(c => [c.role, c.id]));
 
-  const team = p.agents.map(a => {
-    const ref = parseAgentRef(a.name);
-    const id = ref.id || slugify(a.name);
-    return {
-      id,
-      name: ref.name || a.name,
-      role: a.role,
-      color: colorFor(id),
-      busy: busyBy.has(id),
-      currentTask: busyBy.get(id) || null,
-    };
-  });
+  // Registry roles when the project has one; legacy roster otherwise.
+  const team = (p.roles && p.roles.length)
+    ? p.roles.map(r => ({
+        id: r.id,
+        name: r.name,
+        role: firstSentence(r.charter) || r.name,
+        charter: r.charter,
+        status: r.status,
+        cardsCompleted: r.cardsCompleted,
+        rework: r.rework,
+        color: colorFor(r.id),
+        busy: busyBy.has(r.id),
+        currentTask: busyBy.get(r.id) || null,
+      }))
+    : p.agents.map(a => {
+        const ref = parseAgentRef(a.name);
+        const id = ref.id || slugify(a.name);
+        return {
+          id,
+          name: ref.name || a.name,
+          role: a.role,
+          charter: '',
+          status: 'active',
+          cardsCompleted: 0,
+          rework: 0,
+          color: colorFor(id),
+          busy: busyBy.has(id),
+          currentTask: busyBy.get(id) || null,
+        };
+      });
 
   // Derived — the markdown carries no explicit field for these.
   const awaitingHuman = p.awaitingHuman;
@@ -127,6 +157,9 @@ function buildBoardJson(projectDir) {
       round: p.round,
       maxRounds: numOr(p.config['max-rounds-per-sprint'], 20),
       parallelism: numOr(p.config.parallelism, 3),
+      maxRoleMints: numOr(p.config['max-role-mints-per-sprint'], 4),
+      maxActiveRoles: numOr(p.config['max-active-roles'], 10),
+      autopilot: String(p.config.autopilot || 'off').toLowerCase() === 'on' ? 'on' : 'off',
       activeWorktrees,
       sprintRunning,
       nextGate: nextGateFor(p.methodology, p.phase),
