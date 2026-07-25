@@ -28,6 +28,11 @@ function parseAgentRef(text) {
   return { name: raw, id: slugify(raw) };
 }
 
+// Structured metadata values may carry a trailing "# note" per the card schema.
+function stripInlineComment(value) {
+  return String(value == null ? '' : value).replace(/\s+#.*$/, '').trim();
+}
+
 // project-config.md: "- key: value" lines, trailing "# comment" stripped.
 // Multi-line block values (key: |) are skipped — nothing in the contract needs them.
 function parseConfig(text) {
@@ -73,21 +78,22 @@ function parseKanban(text) {
       continue;
     }
     if (card && (m = line.match(/^\s*-\s*assignee:\s*(.+?)\s*$/))) {
-      card.assignee = m[1];
-      const ref = parseAgentRef(m[1]);
+      const clean = stripInlineComment(m[1]);
+      card.assignee = clean;
+      const ref = parseAgentRef(clean);
       card.assigneeName = ref.name;
       card.assigneeId = ref.id;
       inDod = false;
       continue;
     }
     if (card && (m = line.match(/^\s*-\s*priority:\s*(.+?)\s*$/))) {
-      card.priority = m[1]; inDod = false; continue;
+      card.priority = stripInlineComment(m[1]); inDod = false; continue;
     }
     if (card && (m = line.match(/^\s*-\s*branch:\s*(.+?)\s*$/))) {
-      card.branch = m[1]; inDod = false; continue;
+      card.branch = stripInlineComment(m[1]); inDod = false; continue;
     }
     if (card && (m = line.match(/^\s*-\s*reviewer:\s*(.+?)\s*$/))) {
-      card.reviewer = parseAgentRef(m[1]); inDod = false; continue;
+      card.reviewer = parseAgentRef(stripInlineComment(m[1])); inDod = false; continue;
     }
     if (card && (m = line.match(/^\s*-\s*depends-on:\s*\[(.*?)\]\s*$/))) {
       card.dependsOn = m[1].split(',').map(s => s.trim()).filter(Boolean);

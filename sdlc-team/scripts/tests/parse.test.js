@@ -207,3 +207,38 @@ test('parseProject exposes config and awaitingHuman', () => {
   model = parseProject(dir);
   assert.strictEqual(model.awaitingHuman, true);
 });
+
+test('parseKanban handles plain questions, empty deps and commented fields', () => {
+  const KANBAN = `# Kanban — edge
+> methodology: agile | phase: P1
+> last-updated: x | round: 1
+
+## Blocked
+
+### T-020 | Manager question card
+- assignee: Marcus (backend-developer)   # owns the API
+- priority: high                         # bumped after triage
+- depends-on: []
+- branch: sdlc/T-020-thing               # set when work starts
+- reviewer: Sofia (security-reviewer)    # security gate
+- question: which error envelope should this use?
+
+## Backlog
+
+## In Progress
+
+## Review
+
+## Done
+`;
+  const c = parseKanban(KANBAN).board.Blocked[0];
+  assert.strictEqual(c.questionFor, 'manager');
+  assert.strictEqual(c.question, 'which error envelope should this use?');
+  assert.deepStrictEqual(c.dependsOn, []);
+  assert.strictEqual(c.branch, 'sdlc/T-020-thing');
+  assert.strictEqual(c.priority, 'high');
+  assert.strictEqual(c.assigneeName, 'Marcus');
+  assert.strictEqual(c.assigneeId, 'backend-developer');
+  assert.deepStrictEqual(c.reviewer, { name: 'Sofia', id: 'security-reviewer' });
+  assert.deepStrictEqual(c.dod, { done: 0, total: 0 });
+});
