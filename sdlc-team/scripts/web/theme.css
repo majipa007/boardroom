@@ -109,6 +109,76 @@ body[data-theme="wall"] .empty{font-family:'Caveat',cursive;font-size:17px}
 body[data-theme="wall"] .sheet{background:#fff;color:#2E2A26;border-radius:4px;box-shadow:3px 8px 20px rgba(0,0,0,.3)}
 
 /* ============================================================
+   THEME: BLUEPRINT
+   ============================================================ */
+body[data-theme="blueprint"]{
+  --lineW:rgba(214,228,255,.55);--lineF:rgba(214,228,255,.16);--ok:#7CE3A9;--warn:#FFD37A;--alarm:#FF9C8F;
+  font-family:'IBM Plex Mono',monospace;color:#E8F0FF;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 23px,var(--lineF) 23px 24px),
+    repeating-linear-gradient(90deg,transparent 0 23px,var(--lineF) 23px 24px),
+    linear-gradient(135deg,#123C7A 0%,#0E3168 100%);
+}
+body[data-theme="blueprint"] .proj{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+body[data-theme="blueprint"] .meta{color:#9DB4E0;letter-spacing:.1em;text-transform:uppercase;font-size:10.5px}
+body[data-theme="blueprint"] .meta b{color:#E8F0FF}
+body[data-theme="blueprint"] .gate{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;border:1px dashed var(--lineW);padding:6px 14px;color:var(--warn)}
+body[data-theme="blueprint"] .gate[data-attention="true"]{border-style:solid;border-color:var(--alarm);color:var(--alarm)}
+body[data-theme="blueprint"] .toggle{background:transparent;color:#E8F0FF;border-color:var(--lineW);font-family:'Oswald',sans-serif;letter-spacing:.15em;text-transform:uppercase;border-radius:0}
+
+/* ADDED (no demo reference): rail as a SHEET INDEX panel */
+body[data-theme="blueprint"] .rail{border-right:1px solid var(--lineW)}
+body[data-theme="blueprint"] .rail h4{font-family:'Oswald',sans-serif;letter-spacing:.25em}
+body[data-theme="blueprint"] .rail h4::after{content:" — SHEET INDEX"}
+body[data-theme="blueprint"] .ptab{background:rgba(9,34,74,.55);color:#E8F0FF;border:1px solid var(--lineW);border-radius:0;font-family:'IBM Plex Mono',monospace}
+body[data-theme="blueprint"] .ptab b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+body[data-theme="blueprint"] .ptab small{color:#9DB4E0;letter-spacing:.08em}
+body[data-theme="blueprint"] .ptab[data-active="true"]{border-left:3px solid var(--ok)}
+
+body[data-theme="blueprint"] .team{border:1px solid var(--lineW);margin:14px 32px 0;padding:0;width:max-content;gap:0}
+body[data-theme="blueprint"] .member{border-right:1px dashed var(--lineF);padding:8px 16px;border-radius:0;background:none;box-shadow:none}
+body[data-theme="blueprint"] .member:last-child{border-right:0}
+body[data-theme="blueprint"] .face{display:none}
+body[data-theme="blueprint"] .member b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+body[data-theme="blueprint"] .member small{letter-spacing:.12em;text-transform:uppercase;color:#9DB4E0}
+body[data-theme="blueprint"] .member[data-busy]::after{content:"▸ RUNNING";color:var(--ok)}
+
+body[data-theme="blueprint"] .col{border-top:1px solid var(--lineW);border-right:0;padding:10px 0 0}
+body[data-theme="blueprint"] .col h2{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.2em;text-transform:uppercase;background:none;box-shadow:none;transform:none;width:auto;margin:0 0 14px;padding:0;text-align:left}
+body[data-theme="blueprint"] .card{background:rgba(9,34,74,.55);border:1px solid var(--lineW);border-radius:0;box-shadow:none;max-width:none;transform:none;color:#E8F0FF}
+body[data-theme="blueprint"] .card::before{content:none}
+body[data-theme="blueprint"] .card:hover{transform:translateY(-2px)}
+body[data-theme="blueprint"] .tid{color:#9DB4E0}
+body[data-theme="blueprint"] .ttl{font-family:'Oswald',sans-serif;font-size:14.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+body[data-theme="blueprint"] .who{color:#9DB4E0;letter-spacing:.1em;text-transform:uppercase;font-size:9.5px}
+body[data-theme="blueprint"] .who::before{content:"crew: "}
+body[data-theme="blueprint"] .card[data-priority="high"] .tid::after{content:" · PRI-A";color:var(--warn)}
+body[data-theme="blueprint"] .dod{color:#9DB4E0}
+body[data-theme="blueprint"] .dod .bar{background:rgba(214,228,255,.15);border-radius:0}
+body[data-theme="blueprint"] .dod .bar i{background:var(--ok)}
+body[data-theme="blueprint"] .q{color:var(--alarm);background:rgba(255,156,143,.07);border-left:2px solid var(--alarm);border-radius:0}
+body[data-theme="blueprint"] .q::before{content:"RFI → HUMAN: ";letter-spacing:.1em}
+body[data-theme="blueprint"] .card[data-stamp]::after{content:attr(data-stamp-bp);font-family:'Oswald',sans-serif;letter-spacing:.14em;top:8px;bottom:auto;border-radius:0}
+body[data-theme="blueprint"] .card[data-stamp="merged"]::after{color:var(--ok);border-color:var(--ok)}
+body[data-theme="blueprint"] .card[data-stamp="hold"]::after{color:var(--alarm);border-color:var(--alarm)}
+body[data-theme="blueprint"] .card[data-stamp="inspect"]::after{color:var(--warn);border-color:var(--warn)}
+body[data-theme="blueprint"] .card[data-stamp="wip"]::after{color:#E8F0FF;border-color:#E8F0FF;opacity:.7}
+body[data-theme="blueprint"] .feed{border:1px solid var(--lineW);background:rgba(9,34,74,.85);border-radius:0;box-shadow:none}
+body[data-theme="blueprint"] .feed h4{font-family:'Oswald',sans-serif;letter-spacing:.25em}
+body[data-theme="blueprint"] .feed .row{color:#9DB4E0}
+body[data-theme="blueprint"] .feed time{color:#E8F0FF}
+
+/* ADDED (no demo reference): dashed empty placeholder, overlay surface */
+body[data-theme="blueprint"] .empty{border:1px dashed var(--lineW);padding:10px;text-align:center;font-family:'Oswald',sans-serif;letter-spacing:.14em;font-size:11px;opacity:.85}
+body[data-theme="blueprint"] .sheet{background:#0E3168;color:#E8F0FF;border:1px solid var(--lineW);border-radius:0}
+
+body[data-theme="blueprint"] .titleblock{display:grid;grid-template-columns:repeat(4,auto);width:max-content;margin:0 32px 30px auto;border:1px solid var(--lineW);background:rgba(9,34,74,.85)}
+body[data-theme="blueprint"] .titleblock div{padding:8px 16px;border-left:1px solid var(--lineF)}
+body[data-theme="blueprint"] .titleblock div:first-child{border-left:0}
+body[data-theme="blueprint"] .titleblock small{display:block;font-size:9px;letter-spacing:.18em;color:#9DB4E0}
+body[data-theme="blueprint"] .titleblock b{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.08em}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width:1100px){
