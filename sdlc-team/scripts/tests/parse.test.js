@@ -258,3 +258,123 @@ test('parseKanban handles plain questions, empty deps and commented fields', () 
   assert.deepStrictEqual(c.reviewer, { name: 'Sofia', id: 'security-reviewer' });
   assert.deepStrictEqual(c.dod, { done: 0, total: 0 });
 });
+
+const { parseRoleRegistry, parseRoleRef } = require('../lib/parse');
+
+const REGISTRY = `# Role Registry
+
+## R-01 · backend
+- charter: Owns server code: API routes, business logic, DB schema/migrations, server tests.
+- boundaries: Never edits mobile/web UI code, CI config, or deployment manifests.
+- conventions: |
+    zod for validation; error envelope in src/api/errors.ts.
+    money in integer minor units.
+- default-tools: standard
+- status: active
+- minted: 2026-07-25 by Priya (init)
+- history: 6 cards completed, 1 rework
+
+## R-04 · sec-review
+- charter: Reviews diffs for security: authz, input handling, secrets, dependencies.
+- boundaries: Read-only on source. Output only via inbox.
+- status: active
+- minted: 2026-07-25 by Priya (auto)
+- history: 0 cards completed, 0 rework
+
+## R-07 · legacy-infra
+- charter: Old infra role.
+- status: retired
+- minted: 2026-07-20 by Priya (init)
+- history: 2 cards completed, 3 rework
+`;
+
+const ROLE_KANBAN = `# Kanban — roles
+> methodology: agile | phase: P1
+> last-updated: x | round: 4
+
+## Blocked
+
+## Backlog
+
+### T-020 | Refresh endpoint
+- role: R-01 backend
+- verify-roles: [R-04 sec-review, R-05 qa-verify]
+- priority: high
+
+### T-021 | Legacy still parses
+- assignee: Marcus (backend-developer)
+- priority: low
+
+## In Progress
+
+## Review
+
+## Done
+`;
+
+test('parseRoleRegistry reads every role and its fields', () => {
+  const roles = parseRoleRegistry(REGISTRY);
+  assert.strictEqual(roles.length, 3);
+
+  const backend = roles[0];
+  assert.strictEqual(backend.id, 'R-01');
+  assert.strictEqual(backend.name, 'backend');
+  assert.match(backend.charter, /^Owns server code/);
+  assert.match(backend.boundaries, /Never edits mobile/);
+  assert.match(backend.conventions, /zod for validation/);
+  assert.match(backend.conventions, /integer minor units/);   // multi-line block joined
+  assert.strictEqual(backend.defaultTools, 'standard');
+  assert.strictEqual(backend.status, 'active');
+  assert.strictEqual(backend.cardsCompleted, 6);
+  assert.strictEqual(backend.rework, 1);
+
+  assert.strictEqual(roles[1].id, 'R-04');
+  assert.strictEqual(roles[1].name, 'sec-review');
+  assert.strictEqual(roles[1].conventions, '');               // absent -> empty
+  assert.strictEqual(roles[2].status, 'retired');
+  assert.strictEqual(roles[2].rework, 3);
+});
+
+test('parseRoleRegistry returns [] for a legacy table roster', () => {
+  const legacy = `# Team Roster\n\n| Name | Role |\n|---|---|\n| Manager | Manager / Orchestrator |\n`;
+  assert.deepStrictEqual(parseRoleRegistry(legacy), []);
+});
+
+test('parseRoleRef splits "R-01 backend" and bare names', () => {
+  assert.deepStrictEqual(parseRoleRef('R-01 backend'), { id: 'R-01', name: 'backend' });
+  assert.deepStrictEqual(parseRoleRef('backend'), { id: '', name: 'backend' });
+  assert.deepStrictEqual(parseRoleRef(''), { id: '', name: '' });
+});
+
+test('parseKanban reads role and verify-roles, and still reads legacy assignee', () => {
+  const { board } = parseKanban(ROLE_KANBAN);
+  const [roleCard, legacyCard] = board.Backlog;
+
+  assert.strictEqual(roleCard.roleId, 'R-01');
+  assert.strictEqual(roleCard.roleName, 'backend');
+  assert.deepStrictEqual(roleCard.verifyRoles, [
+    { id: 'R-04', name: 'sec-review' },
+    { id: 'R-05', name: 'qa-verify' },
+  ]);
+
+  // legacy card: role fields empty, assignee fields still populated
+  assert.strictEqual(legacyCard.roleId, '');
+  assert.strictEqual(legacyCard.roleName, '');
+  assert.deepStrictEqual(legacyCard.verifyRoles, []);
+  assert.strictEqual(legacyCard.assigneeName, 'Marcus');
+  assert.strictEqual(legacyCard.assigneeId, 'backend-developer');
+});
+
+test('parseProject exposes roles from a registry team.md', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roles-'));
+  const sdlc = path.join(dir, '.sdlc');
+  fs.mkdirSync(path.join(sdlc, 'inbox'), { recursive: true });
+  fs.mkdirSync(path.join(sdlc, 'archive'), { recursive: true });
+  fs.writeFileSync(path.join(sdlc, 'kanban.md'), ROLE_KANBAN);
+  fs.writeFileSync(path.join(sdlc, 'team.md'), REGISTRY);
+
+  const model = parseProject(dir);
+  assert.strictEqual(model.roles.length, 3);
+  assert.strictEqual(model.roles[0].id, 'R-01');
+  assert.deepStrictEqual(model.agents, []);        // no legacy table rows present
+});

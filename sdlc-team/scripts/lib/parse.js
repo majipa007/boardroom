@@ -72,6 +72,7 @@ function parseKanban(text) {
         assigneeName: '', assigneeId: '', branch: '', reviewer: null,
         dependsOn: [], question: '', questionFor: '',
         dod: { done: 0, total: 0 }, raw: '',
+        roleId: '', roleName: '', verifyRoles: [],
       } : null;
       if (card) board[col].push(card);
       inDod = false;
@@ -107,6 +108,18 @@ function parseKanban(text) {
     if (card && (m = line.match(/^\s*-\s*question(\(HUMAN\))?:\s*(.+?)\s*$/i))) {
       card.question = m[2];
       card.questionFor = m[1] ? 'human' : 'manager';
+      inDod = false;
+      continue;
+    }
+    if (card && (m = line.match(/^\s*-\s*role:\s*(.+?)\s*$/))) {
+      const ref = parseRoleRef(stripInlineComment(m[1]));
+      card.roleId = ref.id;
+      card.roleName = ref.name;
+      inDod = false;
+      continue;
+    }
+    if (card && (m = line.match(/^\s*-\s*verify-roles:\s*\[(.*?)\]\s*$/))) {
+      card.verifyRoles = m[1].split(',').map(s => s.trim()).filter(Boolean).map(parseRoleRef);
       inDod = false;
       continue;
     }
@@ -170,9 +183,68 @@ function computeLastActivity(sdlcDir) {
   return latest;
 }
 
+// "R-01 backend" -> {id:'R-01', name:'backend'};  "backend" -> {id:'', name:'backend'}
+function parseRoleRef(text) {
+  const raw = String(text == null ? '' : text).trim();
+  if (!raw) return { id: '', name: '' };
+  const m = raw.match(/^(R-\d+)\s*[·:|-]?\s*(.*)$/);
+  if (m) return { id: m[1], name: m[2].trim() };
+  return { id: '', name: raw };
+}
+
+// team.md as a role registry: "## R-01 · backend" sections with "- key: value"
+// fields, where `conventions:` may be a multi-line "|" block. Returns [] when the
+// text has no role headings (i.e. it is still the legacy markdown-table roster).
+function parseRoleRegistry(text) {
+  const roles = [];
+  let role = null;
+  let blockKey = null;          // which field is currently consuming a "|" block
+  const FIELD = {
+    charter: 'charter', boundaries: 'boundaries', conventions: 'conventions',
+    'default-tools': 'defaultTools', status: 'status', minted: 'minted', history: 'history',
+  };
+
+  for (const line of String(text || '').split(/\r?\n/)) {
+    let m;
+    if ((m = line.match(/^##\s+(R-\d+)\s*[·:|-]?\s*(.*?)\s*$/))) {
+      role = {
+        id: m[1], name: m[2].trim(),
+        charter: '', boundaries: '', conventions: '', defaultTools: '',
+        status: 'active', minted: '', history: '', cardsCompleted: 0, rework: 0,
+      };
+      roles.push(role);
+      blockKey = null;
+      continue;
+    }
+    if (!role) continue;
+
+    if ((m = line.match(/^-\s*([a-z-]+):\s*(.*)$/i))) {
+      const key = FIELD[m[1].toLowerCase()];
+      const value = m[2].replace(/\s+#.*$/, '').trim();
+      blockKey = null;
+      if (!key) continue;
+      if (value === '|') { blockKey = key; continue; }   // multi-line block follows
+      role[key] = value;
+      if (key === 'history') {
+        const done = value.match(/(\d+)\s+cards?\s+completed/i);
+        const rw = value.match(/(\d+)\s+rework/i);
+        role.cardsCompleted = done ? Number(done[1]) : 0;
+        role.rework = rw ? Number(rw[1]) : 0;
+      }
+      continue;
+    }
+    // continuation lines of a "|" block are indented
+    if (blockKey && /^\s+\S/.test(line)) {
+      role[blockKey] += (role[blockKey] ? ' ' : '') + line.trim();
+    }
+  }
+  return roles;
+}
+
 function parseProject(projectDir) {
   const sdlc = path.join(projectDir, '.sdlc');
   const { header, board } = parseKanban(readOr(path.join(sdlc, 'kanban.md')));
+  const teamText = readOr(path.join(sdlc, 'team.md'));
   return {
     name: path.basename(projectDir),
     path: projectDir,
@@ -180,7 +252,8 @@ function parseProject(projectDir) {
     methodology: header.methodology,
     phase: header.phase,
     round: header.round,
-    agents: parseTeam(readOr(path.join(sdlc, 'team.md'))),
+    agents: parseTeam(teamText),
+    roles: parseRoleRegistry(teamText),
     board,
     inbox: listMessages(path.join(sdlc, 'inbox')),
     archive: listMessages(path.join(sdlc, 'archive')),
@@ -191,5 +264,5 @@ function parseProject(projectDir) {
 
 module.exports = {
   COLUMNS, parseKanban, parseTeam, parseMessage, listMessages, computeLastActivity, parseProject,
-  slugify, parseAgentRef, parseConfig,
+  slugify, parseAgentRef, parseConfig, parseRoleRegistry, parseRoleRef,
 };
