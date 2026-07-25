@@ -1,3 +1,6 @@
 # Plugin dev artifacts
 *.log
 .DS_Store
+
+# SDD build scratch (ledger, briefs, review diffs)
+.superpowers/
