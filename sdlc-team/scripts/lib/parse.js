@@ -199,12 +199,30 @@ function parseRoleRegistry(text) {
   const roles = [];
   let role = null;
   let blockKey = null;          // which field is currently consuming a "|" block
+  let inComment = false;        // inside an <!-- ... --> block (commented-out example roles)
   const FIELD = {
     charter: 'charter', boundaries: 'boundaries', conventions: 'conventions',
     'default-tools': 'defaultTools', status: 'status', minted: 'minted', history: 'history',
   };
 
-  for (const line of String(text || '').split(/\r?\n/)) {
+  for (let line of String(text || '').split(/\r?\n/)) {
+    if (inComment) {
+      const close = line.indexOf('-->');
+      if (close === -1) continue;
+      line = line.slice(close + 3);
+      inComment = false;
+    }
+    // Strip any HTML comment(s) that start on this line, whether or not they close on it.
+    let openIdx;
+    while ((openIdx = line.indexOf('<!--')) !== -1) {
+      const closeIdx = line.indexOf('-->', openIdx);
+      if (closeIdx === -1) {
+        line = line.slice(0, openIdx);
+        inComment = true;
+        break;
+      }
+      line = line.slice(0, openIdx) + line.slice(closeIdx + 3);
+    }
     let m;
     if ((m = line.match(/^##\s+(R-\d+)\s*[·:|-]?\s*(.*?)\s*$/))) {
       role = {

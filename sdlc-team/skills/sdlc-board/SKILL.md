@@ -58,7 +58,7 @@ Columns, in fixed order. Cards live under a column heading.
 
 **Card rules:**
 - Task IDs are `T-###`, monotonically increasing, assigned only by the Manager.
-- A DoD checkbox may only be checked by the role that owns it: the QA Engineer owns test boxes, the Security Reviewer owns security boxes, the implementing worker owns implementation boxes, the Manager owns the merge box. Ownership is requested via inbox and applied by the Manager.
+- A DoD checkbox may only be checked by the role that owns it: `qa-verify` owns test boxes, `sec-review` owns security boxes, the implementing role owns implementation boxes, the Manager owns the merge box. Ownership is requested via inbox and applied by the Manager.
 
 ## Risk classification → mandatory verify-roles
 

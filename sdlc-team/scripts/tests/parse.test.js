@@ -378,3 +378,36 @@ test('parseProject exposes roles from a registry team.md', () => {
   assert.strictEqual(model.roles[0].id, 'R-01');
   assert.deepStrictEqual(model.agents, []);        // no legacy table rows present
 });
+
+test('parseRoleRegistry ignores roles inside HTML comments', () => {
+  const commented = `# Role Registry
+
+<!--
+## R-01 · backend
+- charter: Example only.
+- status: active
+-->
+`;
+  assert.deepStrictEqual(parseRoleRegistry(commented), []);
+
+  // same-line comment, and a real role after a closed comment block
+  const mixed = `# Role Registry
+<!-- ## R-09 · ignored -->
+
+## R-02 · frontend
+- charter: Owns the UI.
+- status: active
+- history: 1 cards completed, 0 rework
+`;
+  const roles = parseRoleRegistry(mixed);
+  assert.strictEqual(roles.length, 1);
+  assert.strictEqual(roles[0].id, 'R-02');
+  assert.strictEqual(roles[0].name, 'frontend');
+});
+
+test('the shipped team.md template is an empty registry', () => {
+  const tpl = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'skills', 'sdlc-board', 'templates', 'team.md'), 'utf8');
+  assert.deepStrictEqual(parseRoleRegistry(tpl), [],
+    'the commented example must not parse as a real role');
+});
