@@ -394,7 +394,10 @@ Safety rails:
 
 ## 11. Non-goals for v1 (explicitly out of scope)
 
-- ~~Dynamic team composition (adding/removing personas at runtime).~~ **Superseded (2026-07-25): the manager now composes a project-specific roster and writes specialist agent files at init; see docs/superpowers/plans/2026-07-25-dynamic-team.md.**
+- ~~Dynamic team composition (adding/removing personas at runtime).~~ **Superseded twice: the
+  manager first composed per-project specialists (2026-07-25), and now maintains a runtime
+  role registry with mandatory risk-based verification and an autopilot loop — see
+  docs/dynamic-roles-spec.md and docs/superpowers/plans/2026-07-25-dynamic-roles-autopilot.md.**
 - External integrations (GitHub Issues sync, Slack, CI providers) — the board is self-contained.
 - Sofia writing fixes herself (she only proposes tasks).
 - Multiple concurrent sprints/boards per repo.

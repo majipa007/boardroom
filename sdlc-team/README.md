@@ -31,19 +31,26 @@ Requires **Node.js ≥ 18** for `/sdlc-dashboard` only; everything else is Markd
 | `/sdlc-override <methodology\|key=value>` | Change methodology or config; the manager restructures the board and logs the decision. |
 | `/sdlc-dashboard [--port N] [--root DIR]` | Launch the read-only local web dashboard — two themes (Sprint Wall / Blueprint), live board, team, and a recent-activity feed drawn from the archive, for every project. |
 
-## The team
+## Roles
 
-Always present (ship with the plugin):
+There are exactly three shipped agents:
 
-| Agent | Role | Hard boundary |
-|---|---|---|
-| `manager` | Manager / Orchestrator | The only writer of the board. Decomposes, assigns, merges, runs checkpoints, composes the team. Never implements features. |
-| `security-reviewer` | Security | Reviews branch diffs, rates findings `low`→`critical`, files fixes as proposed tasks. High/critical halts the loop. Never fixes code itself. |
-| `qa-engineer` | QA | Runs and writes tests, verifies DoD boxes, signs off cards. Never modifies non-test source. |
+| Agent | What it is |
+|---|---|
+| `manager` | The orchestrator. Sole writer of the board and the role registry. Allocates, classifies, merges, runs checkpoints. Never implements. |
+| `worker` | A generic implementer. Spawned with a role charter and one card; runs in its own git worktree. |
+| `reviewer` | A generic verifier. Spawned with a review charter (`sec-review`, `qa-verify`, …); read-only on source. |
 
-**Every implementation specialist is composed per project.** At `/sdlc-init` the manager decides which roles the brief needs (backend, frontend, mobile, ML, data, infra, docs, …), writes each as an agent into your project's `.claude/agents/<role>.md` with its own scope boundaries, and records the roster in `.sdlc/team.md`. There is no fixed developer list.
+**The team itself is a role registry**, kept in `.sdlc/team.md` and owned by the manager. Each
+role has a stable id (`R-01`), a charter, hard boundaries, and `conventions` that accumulate
+as the project goes. The manager reuses or extends an existing role when it can and mints a
+new one only when nothing covers the need — every such decision is logged, never a prompt.
 
-> **First run:** if `.claude/agents/` had to be created, restart Claude Code once before `/sprint` so the new agents load. Roles added mid-project are picked up automatically.
+Cards say `role: R-01 backend` and carry mandatory `verify-roles` derived from risk: anything
+touching auth, input parsing, secrets, dependencies or file/network handling gets
+`sec-review`; anything producing executable code gets `qa-verify`. **A card cannot reach Done
+until every verify-role has signed off in `archive/`**, and the worker that implemented a card
+never verifies it.
 
 ## How it works
 
@@ -52,6 +59,19 @@ Always present (ship with the plugin):
 - **Parallel, zero conflicts:** each worker runs in its own git worktree on branch `sdlc/<task-id>-<slug>`; the manager merges one branch at a time and turns conflicts into fix cards rather than resolving blindly.
 - **Definition of Done** lives on every card as checkboxes, each owned by the role responsible for it. A card reaches Done only when every box is checked.
 - **Checkpoints** halt the loop and ask you: plan approval, sprint/phase gate, high/critical security finding, blocked escalation, round cap. A Stop hook prevents the session ending with open cards unless `.sdlc/.awaiting-human` is set.
+
+## Autopilot
+
+Set `autopilot: on` in `.sdlc/project-config.md` (or run `/sprint --auto`) and the loop keeps
+going, logging its decisions instead of asking. It halts on exactly five things: init
+approval, a high/critical security finding, batched `question(HUMAN)` items, the round cap,
+and completion. Role mints, charter edits, allocation and serialization are auto-decisions
+recorded in the Decision Log. Questions raised mid-round are queued in
+`.sdlc/human-queue.md` and presented together at the next stop — the loop never halts
+mid-round. A failing test run blocks a merge unconditionally, autopilot or not.
+
+Caps keep it bounded: `parallelism` (3), `max-role-mints-per-sprint` (4) and
+`max-active-roles` (10).
 
 ## Dashboard
 
@@ -72,8 +92,6 @@ the page polls it every 5 seconds and repaints only when the content hash change
     ├── project-config.md   # methodology, checkpoints, decision log
     ├── inbox/              # worker → manager messages
     └── archive/            # processed messages (project history)
-
-    .claude/agents/         # specialists the manager wrote for this project
 
 Commit `.sdlc/` — it is your project-management record.
 

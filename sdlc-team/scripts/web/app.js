@@ -130,7 +130,11 @@ function renderTeam(d) {
     s.appendChild(el('span', 'face', (m.name || m.id || '?').trim().charAt(0).toUpperCase()));
     s.appendChild(el('b', null, m.name || m.id));
     s.append(' ');
-    s.appendChild(el('small', null, m.busy && m.currentTask ? `${m.role} · ${m.currentTask}` : m.role));
+    const detail = [m.role];
+    if (m.busy && m.currentTask) detail.push(m.currentTask);
+    if (m.rework >= 2) detail.push(`⚠ ${m.rework} rework`);
+    s.appendChild(el('small', null, detail.filter(Boolean).join(' · ')));
+    if (m.status === 'retired') s.dataset.retired = 'true';
     host.appendChild(s);
   }
 }
@@ -138,7 +142,9 @@ function renderTeam(d) {
 function cardNode(c, byId) {
   const a = el('article', 'card');
   a.dataset.status = c.status;
-  a.dataset.agent = c.assignee || '';
+  const roleKey = c.role || c.assignee || '';
+  a.dataset.agent = roleKey;                 // CSS colour hook (unchanged attribute name)
+  a.dataset.role = roleKey;
   if (c.priority) a.dataset.priority = c.priority;
   if (c.questionFor) a.dataset.questionFor = c.questionFor;
   const stamp = STAMPS[c.status];
@@ -147,14 +153,13 @@ function cardNode(c, byId) {
     a.dataset.stampWall = stamp[1];
     a.dataset.stampBp = stamp[2];
   }
-  const agent = byId[c.assignee];
+  const agent = byId[roleKey];
   if (agent && agent.color) a.style.setProperty('--note', agent.color);
 
   a.appendChild(el('span', 'tid', c.id));
   a.appendChild(el('h3', 'ttl', c.title));
-  a.appendChild(el('div', 'who', c.reviewerName
-    ? `${c.assigneeName || c.assignee} → ${c.reviewerName}`
-    : (c.assigneeName || c.assignee || 'unassigned')));
+  const whoText = c.roleName || c.assigneeName || roleKey || 'unassigned';
+  a.appendChild(el('div', 'who', c.reviewerName ? `${whoText} → ${c.reviewerName}` : whoText));
 
   if (c.dod && c.dod.total > 0) {
     const pct = Math.round((c.dod.done / c.dod.total) * 100);
@@ -245,6 +250,10 @@ function openOverlay(c) {
     body.appendChild(el('p', null, `depends on: ${c.dependsOn.join(', ')}`));
   }
   if (c.question) body.appendChild(el('p', null, `question (${c.questionFor}): ${c.question}`));
+  if (c.verifyRoles && c.verifyRoles.length) {
+    body.appendChild(el('p', null,
+      'must be verified by: ' + c.verifyRoles.map(v => `${v.id} ${v.name}`.trim()).join(', ')));
+  }
   if (c.dod && c.dod.total) {
     body.appendChild(el('p', null, `definition of done: ${c.dod.done} of ${c.dod.total} complete`));
   }

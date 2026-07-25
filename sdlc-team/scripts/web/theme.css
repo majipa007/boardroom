@@ -88,6 +88,7 @@ body[data-theme="wall"] #railSelect{background:#fff;color:#2E2A26;border:1px sol
 body[data-theme="wall"] .member{background:#fff;border-radius:20px;box-shadow:1px 2px 5px rgba(0,0,0,.12)}
 body[data-theme="wall"] .face{font-family:'Caveat',cursive}
 body[data-theme="wall"] .member[data-busy]::after{color:#3E8E5A}
+body[data-theme="wall"] .member[data-retired]{opacity:.55;filter:grayscale(.5)}
 
 /* ADAPTATION 1: palette arrives as --note (set inline per agent), replacing the
    demo's six hardcoded [data-agent="name"] rules — the roster is dynamic. */
@@ -167,6 +168,7 @@ body[data-theme="blueprint"] .face{display:none}
 body[data-theme="blueprint"] .member b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
 body[data-theme="blueprint"] .member small{letter-spacing:.12em;text-transform:uppercase;color:#9DB4E0;opacity:1}
 body[data-theme="blueprint"] .member[data-busy]::after{content:"▸ RUNNING";color:var(--ok)}
+body[data-theme="blueprint"] .member[data-retired]{opacity:.6}
 
 body[data-theme="blueprint"] .col{border-top:1px solid var(--lineW);border-right:0;padding:10px 0 0}
 body[data-theme="blueprint"] .col h2{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.2em;text-transform:uppercase;background:none;box-shadow:none;transform:none;width:auto;margin:0 0 14px;padding:0;text-align:left}
