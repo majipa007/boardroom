@@ -68,7 +68,10 @@ body[data-theme="wall"]{
   background:radial-gradient(circle at 30% 20%,#E9E4DC 0%,#DFD8CC 100%);
 }
 body[data-theme="wall"] .proj{font-family:'Caveat',cursive;font-size:44px;transform:rotate(-1.2deg)}
-body[data-theme="wall"] .meta{color:#8A8177;font-weight:600}
+/* Demo uses #8A8177, which measures 2.7:1 on the plaster gradient and fails the
+   spec's AA floor. Darkened to the nearest warm grey that passes: 4.66:1 against
+   the darker stop (#DFD8CC), 5.21:1 against the lighter (#E9E4DC). */
+body[data-theme="wall"] .meta{color:#635C52;font-weight:600}
 body[data-theme="wall"] .meta b{color:#2E2A26}
 body[data-theme="wall"] .gate{font-family:'Caveat',cursive;font-size:20px;background:#fff;padding:6px 16px;border-radius:4px;box-shadow:2px 3px 8px rgba(0,0,0,.12);transform:rotate(1.5deg);border-left:6px solid #FFD2A6}
 body[data-theme="wall"] .gate[data-attention="true"]{border-left-color:#B33A3A;color:#B33A3A;font-weight:700}
@@ -135,7 +138,9 @@ body[data-theme="blueprint"] .ptab b{font-family:'Oswald',sans-serif;letter-spac
 body[data-theme="blueprint"] .ptab small{color:#9DB4E0;letter-spacing:.08em}
 body[data-theme="blueprint"] .ptab[data-active="true"]{border-left:3px solid var(--ok)}
 
-body[data-theme="blueprint"] .team{border:1px solid var(--lineW);margin:14px 32px 0;padding:0;width:max-content;gap:0}
+/* width:max-content keeps the manifest on one line like the demo; the overflow
+   guard makes the STRIP scroll instead of widening the grid track (spec §7). */
+body[data-theme="blueprint"] .team{border:1px solid var(--lineW);margin:14px 32px 0;padding:0;width:max-content;max-width:calc(100% - 64px);overflow-x:auto;flex-wrap:nowrap;gap:0}
 body[data-theme="blueprint"] .member{border-right:1px dashed var(--lineF);padding:8px 16px;border-radius:0;background:none;box-shadow:none}
 body[data-theme="blueprint"] .member:last-child{border-right:0}
 body[data-theme="blueprint"] .face{display:none}
@@ -154,7 +159,7 @@ body[data-theme="blueprint"] .who{color:#9DB4E0;letter-spacing:.1em;text-transfo
 body[data-theme="blueprint"] .who::before{content:"crew: "}
 body[data-theme="blueprint"] .card[data-priority="high"] .tid::after{content:" · PRI-A";color:var(--warn)}
 body[data-theme="blueprint"] .dod{color:#9DB4E0}
-body[data-theme="blueprint"] .dod .bar{background:rgba(214,228,255,.15);border-radius:0}
+body[data-theme="blueprint"] .dod .bar{background:rgba(214,228,255,.15)}
 body[data-theme="blueprint"] .dod .bar i{background:var(--ok)}
 body[data-theme="blueprint"] .q{color:var(--alarm);background:rgba(255,156,143,.07);border-left:2px solid var(--alarm);border-radius:0}
 body[data-theme="blueprint"] .q::before{content:"RFI → HUMAN: ";letter-spacing:.1em}
