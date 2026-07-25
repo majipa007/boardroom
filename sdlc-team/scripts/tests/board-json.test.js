@@ -190,3 +190,34 @@ test('buildPayload reports an error state with no projects', () => {
   assert.deepStrictEqual(p.projects, []);
   assert.ok(typeof p.error === 'string' && p.error.length > 0);
 });
+
+test('numeric config falls back when the value is malformed', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bj-'));
+  const dir = makeProject(base, 'weird');
+  const cfg = path.join(dir, '.sdlc', 'project-config.md');
+  fs.writeFileSync(cfg, '# Project Config\n- project: Weird\n- methodology: agile\n- parallelism: three\n- max-rounds-per-sprint: lots\n');
+  const b = buildBoardJson(dir);
+  assert.strictEqual(b.project.parallelism, 3);
+  assert.strictEqual(b.project.maxRounds, 20);
+  // must survive serialization as real numbers, not null
+  const round = JSON.parse(JSON.stringify(b));
+  assert.strictEqual(round.project.parallelism, 3);
+  assert.strictEqual(round.project.maxRounds, 20);
+});
+
+test('buildPayload revision changes when only another project changed', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bj-'));
+  const a = makeProject(base, 'alpha');
+  const z = makeProject(base, 'zulu');
+
+  const first = buildPayload([a, z], 'alpha').revision;
+  assert.strictEqual(buildPayload([a, z], 'alpha').revision, first, 'stable when nothing changed');
+
+  // change ONLY the non-selected project's board header (its rail row)
+  const zBoard = path.join(z, '.sdlc', 'kanban.md');
+  fs.writeFileSync(zBoard, fs.readFileSync(zBoard, 'utf8').replace('round: 2', 'round: 7'));
+
+  const after = buildPayload([a, z], 'alpha');
+  assert.strictEqual(after.project.name, 'alpha', 'still the selected project');
+  assert.notStrictEqual(after.revision, first, 'rail change must change the revision');
+});

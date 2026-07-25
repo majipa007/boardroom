@@ -43,6 +43,19 @@ function nextGateFor(methodology, phase) {
   return `sprint review after ${phase || 'this sprint'}`;
 }
 
+// Config values are raw strings; fall back to the documented default when the
+// value is missing OR non-numeric (JSON.stringify would otherwise emit null).
+function numOr(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function hashPayload(payload) {
+  return crypto.createHash('sha1')
+    .update(JSON.stringify({ ...payload, revision: undefined }))
+    .digest('hex');
+}
+
 function buildBoardJson(projectDir) {
   const p = parseProject(projectDir);
 
@@ -107,8 +120,8 @@ function buildBoardJson(projectDir) {
       methodology: p.methodology,
       phase: p.phase,
       round: p.round,
-      maxRounds: Number(p.config['max-rounds-per-sprint'] || 20),
-      parallelism: Number(p.config.parallelism || 3),
+      maxRounds: numOr(p.config['max-rounds-per-sprint'], 20),
+      parallelism: numOr(p.config.parallelism, 3),
       activeWorktrees,
       sprintRunning,
       nextGate: nextGateFor(p.methodology, p.phase),
@@ -121,9 +134,7 @@ function buildBoardJson(projectDir) {
   };
 
   // Content hash, not a timestamp: payload changed <=> revision changed.
-  payload.revision = crypto.createHash('sha1')
-    .update(JSON.stringify({ ...payload, revision: undefined }))
-    .digest('hex');
+  payload.revision = hashPayload(payload);
   return payload;
 }
 
@@ -155,6 +166,7 @@ function buildPayload(projectDirs, selectedId) {
       active: d === chosen,
     };
   });
+  board.revision = hashPayload(board);
   return board;
 }
 
