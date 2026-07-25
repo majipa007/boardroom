@@ -82,6 +82,17 @@ function createServer({ root = null, registryPath } = {}) {
 if (require.main === module) {
   const args = parseArgs(process.argv.slice(2));
   const server = createServer({ root: args.root });
+  // A busy port is the common case for a local tool you restart often — say so
+  // plainly instead of dumping an unhandled 'error' event stack trace.
+  server.on('error', (e) => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`Port ${args.port} is already in use — another dashboard is probably still running.`);
+      console.error(`Stop it, or start this one on a different port:  --port ${args.port + 1}`);
+    } else {
+      console.error(`Dashboard failed to start: ${e.message}`);
+    }
+    process.exit(1);
+  });
   server.listen(args.port, '127.0.0.1', () => {
     console.log(`SDLC dashboard running: http://localhost:${args.port}  (Ctrl-C to stop)`);
     if (!args.root) console.log('Tip: pass --root <workspace-dir> to also scan for projects not yet in the registry.');
