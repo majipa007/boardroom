@@ -85,7 +85,8 @@ bash scripts/tests/test-board-check.sh
 bash scripts/tests/test-inbox-validate.sh
 
 # dashboard modules (Node stdlib only)
-node --test scripts/tests/parse.test.js scripts/tests/discover.test.js scripts/tests/dashboard.test.js
+node --test scripts/tests/parse.test.js scripts/tests/discover.test.js \
+            scripts/tests/dashboard.test.js scripts/tests/board-json.test.js
 ```
 
 ## Non-goals (v1)
