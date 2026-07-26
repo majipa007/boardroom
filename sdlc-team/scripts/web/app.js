@@ -42,7 +42,7 @@ function applyTheme(theme) {
   btn.textContent = t === 'blueprint' ? '⇄ SPRINT WALL MODE' : '⇄ BLUEPRINT MODE';
   btn.setAttribute('aria-pressed', String(t === 'blueprint'));
   renderTitle();
-  if (currentData) { renderHeader(currentData); renderBoard(); }  // flavour text + empty hints differ
+  if (currentData) { renderHeader(currentData); renderNeedsYou(currentData); renderBoard(); }  // flavour text + empty hints differ
 }
 
 function renderTitle() {
@@ -201,6 +201,40 @@ function renderBoard() {
   }
 }
 
+// Open questions addressed to the human. There is no separate queue file — a
+// question(HUMAN) card sitting in Blocked IS the queue, so this is derived.
+function humanQuestions(d) {
+  return (d.cards || []).filter(c => c.questionFor === 'human' && c.question);
+}
+
+function renderNeedsYou(d) {
+  const host = document.getElementById('needsyou');
+  host.textContent = '';
+  const open = humanQuestions(d);
+  host.hidden = open.length === 0;
+  if (!open.length) return;
+
+  const n = open.length;
+  host.appendChild(el('h4', null,
+    currentTheme() === 'blueprint'
+      ? `RFI SCHEDULE — ${n} OPEN`
+      : `needs you — ${n} question${n === 1 ? '' : 's'}`));
+
+  for (const c of open) {
+    const row = el('div', 'qrow');
+    row.tabIndex = 0;
+    row.appendChild(el('span', 'qid', c.id));
+    row.appendChild(el('span', 'qtext', c.question));
+    if (c.roleName || c.role) row.appendChild(el('span', 'qrole', c.roleName || c.role));
+    const open1 = () => openOverlay(c);
+    row.addEventListener('click', open1);
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open1(); }
+    });
+    host.appendChild(row);
+  }
+}
+
 function renderFeed(d) {
   const host = document.getElementById('feedRows');
   host.textContent = '';
@@ -295,6 +329,7 @@ async function poll() {
     renderTitle();
     renderHeader(d);
     renderRail(d);
+    renderNeedsYou(d);
     renderTeam(d);
     renderBoard();
     renderFeed(d);

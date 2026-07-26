@@ -1510,3 +1510,19 @@ exactly three agents ship.
 **Type consistency:** `parseRoleRegistry` / `parseRoleRef` are defined in Task 1 with the exact shapes Task 2 consumes. `parseProject().roles` is added in Task 1 and read in Task 2. The card fields Task 1 emits (`roleId`, `roleName`, `verifyRoles`) are exactly what Task 2 maps, and the fields Task 2 emits (`role`, `roleName`, `verifyRoles`, `assignee` alias; `team[].{id,name,role,charter,status,cardsCompleted,rework,color,busy,currentTask}`) are exactly what Task 8's client reads. `card.role` holds the `R-##` id and `team[].id` is that same id, so the existing `byId` lookup keeps working. Agent names are `manager` / `worker` / `reviewer` in Task 4, Task 5, Task 6 and Task 8's docs. Config keys are `max-role-mints-per-sprint`, `max-active-roles`, `autopilot` in Task 3's template, Task 2's payload, and Tasks 5–7's prompts.
 
 **Known limitation, stated rather than hidden:** the autopilot design is partly inferred — this repo has no Autopilot spec. Every inference is marked `INFERRED` in Task 6 and in Decision 1, and the two genuinely invented pieces are the enablement flag and the `.sdlc/human-queue.md` batching file. If the real Autopilot spec differs on those, Task 6 is the only task that needs revisiting.
+
+---
+
+## Post-execution amendment (2026-07-26)
+
+`.sdlc/human-queue.md` — introduced by this plan as Decision 1's inferred batching file — was
+**removed** after the final review. It was a second store for something the board already held:
+a `question(HUMAN)` card is a Blocked card, already parsed (`questionFor: 'human'`) and already
+in `board.json`. A mint-cap breach, the only queue item that was not a card, now becomes a
+Blocked card carrying `question(HUMAN):`.
+
+Consequences: hard stop 3 is now "any open `question(HUMAN)` card on the board"; batching is
+unchanged (finish the round, then present them all); and the review's Critical C1 — a queue
+nobody cleared would re-stop autopilot forever — is structurally impossible, since a card
+leaves Blocked when the Manager records the answer. The dashboard lists the open questions in a
+`.needsyou` panel derived from the same cards.
