@@ -1,14 +1,14 @@
 # Kanban — <project name>
-> methodology: agile | phase: Sprint 1
+> methodology: rad | phase: Sprint 1
 > last-updated: <ISO timestamp> | round: 0
 
-## Blocked
-(cards needing manager/human input — processed FIRST every round)
+## Next
+(decided, not started)
 
-## Backlog
+## In flight
+(being built or verified — the branch is the increment)
 
-## In Progress
+## Shipped
 
-## Review
-
-## Done
+## Killed
+(considered and cut — kept for the record)

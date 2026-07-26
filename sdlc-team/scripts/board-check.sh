@@ -11,15 +11,18 @@ FLAG=".sdlc/.awaiting-human"
 # Legitimately waiting for a human → allow stop.
 [ -f "$FLAG" ] && exit 0
 
-# Count cards ("### T-...") that are NOT under the "## Done" column.
+# Count cards ("### T-...") that are NOT under a closed column (Shipped/Killed, or legacy Done).
 open=$(awk '
-  /^## / { in_done = ($0 == "## Done"); next }
-  /^### T-/ { if (!in_done) count++ }
+  /^## / {
+    done_col = ($0 == "## Shipped" || $0 == "## Killed" || $0 == "## Done")
+    next
+  }
+  /^### T-/ { if (!done_col) count++ }
   END { print count+0 }
 ' "$BOARD")
 
 if [ "$open" -gt 0 ]; then
-  echo "Open cards remain on the SDLC board ($open outside Done) — continue the sprint loop or ask the human." >&2
+  echo "Open cards remain on the SDLC board ($open outside Shipped/Killed) — continue the sprint loop or ask the human." >&2
   exit 2
 fi
 exit 0

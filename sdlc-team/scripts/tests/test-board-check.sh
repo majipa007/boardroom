@@ -35,6 +35,25 @@ FLAG=0 run_case "all done allows" 0 <<'EOF'
 ### T-001 | finished thing
 EOF
 
+# 2b. RAD columns: Shipped + Killed both count as closed → allow (0)
+FLAG=0 run_case "RAD shipped+killed allows" 0 <<'EOF'
+## Next
+## In flight
+## Shipped
+### T-001 | shipped thing
+## Killed
+### T-002 | killed thing
+EOF
+
+# 2c. RAD columns: a card still In flight → block (2)
+FLAG=0 run_case "RAD in-flight card blocks" 2 <<'EOF'
+## Next
+## In flight
+### T-001 | building thing
+## Shipped
+## Killed
+EOF
+
 # 3. Open card but awaiting-human flag set → allow (0)
 FLAG=1 run_case "awaiting-human allows despite open card" 0 <<'EOF'
 ## Backlog

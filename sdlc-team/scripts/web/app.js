@@ -2,19 +2,17 @@
 
 // data-col value -> demo's column heading text
 const COLS = [
-  ['blocked', 'Blocked'],
-  ['backlog', 'Backlog'],
-  ['progress', 'Doing'],
-  ['review', 'Review'],
-  ['done', 'Done'],
+  ['next', 'Next'],
+  ['flight', 'In flight'],
+  ['shipped', 'Shipped'],
+  ['killed', 'Killed'],
 ];
 
-// status -> [data-stamp, data-stamp-wall, data-stamp-bp]; backlog has none
+// status -> [data-stamp, data-stamp-wall, data-stamp-bp]; Next has none
 const STAMPS = {
-  blocked: ['hold', 'held ✋', 'HOLD'],
-  progress: ['wip', 'on it ✍', 'W.I.P.'],
-  review: ['inspect', 'checking 👀', 'INSPECT'],
-  done: ['merged', 'merged ✓', 'MERGED'],
+  flight: ['wip', 'on it ✍', 'W.I.P.'],
+  shipped: ['merged', 'shipped ✓', 'SHIPPED'],
+  killed: ['killed', 'dropped ✕', 'KILLED'],
 };
 
 const EMPTY_HINT = { wall: 'nothing here', blueprint: 'NO ITEMS — SEC CLEAR' };
@@ -42,7 +40,7 @@ function applyTheme(theme) {
   btn.textContent = t === 'blueprint' ? '⇄ SPRINT WALL MODE' : '⇄ BLUEPRINT MODE';
   btn.setAttribute('aria-pressed', String(t === 'blueprint'));
   renderTitle();
-  if (currentData) { renderHeader(currentData); renderNeedsYou(currentData); renderBoard(); }  // flavour text + empty hints differ
+  if (currentData) { renderHeader(currentData); renderNeedsYou(currentData); renderIncrements(currentData); renderBoard(); }  // flavour text + empty hints differ
 }
 
 function renderTitle() {
@@ -74,7 +72,7 @@ function renderHeader(d) {
   meta.appendChild(bold(`${p.round}/${p.maxRounds}`));
   meta.append(' · ');
   meta.appendChild(bold(String(p.activeWorktrees)));
-  meta.append(' worktrees active');
+  meta.append(' in flight');
   if (p.sprintRunning) {
     meta.append(currentTheme() === 'blueprint'
       ? ` · GOOD SERVICE — ROUND ${p.round}/${p.maxRounds}`
@@ -139,6 +137,54 @@ function renderTeam(d) {
   }
 }
 
+// Boxes the human clicked whose inbox message the Manager has not applied yet:
+// `${cardId}:${index}` -> the checked value the human asked for. A box is still
+// pending in EITHER direction (tick or un-tick) until the server data matches it.
+const pendingTicks = new Map();
+
+async function toggleDod(card, index, nextChecked) {
+  const key = `${card.id}:${index}`;
+  pendingTicks.set(key, nextChecked);
+  renderBoard();                          // optimistic: show it immediately as pending
+  try {
+    const r = await fetch('./api/dod', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project: selectedProject, card: card.id, index, checked: nextChecked,
+      }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  } catch (e) {
+    pendingTicks.delete(key);             // failed — drop the optimistic state
+    renderBoard();
+  }
+}
+
+function dodList(card) {
+  const wrap = el('div', 'dodlist');
+  card.dodItems.forEach((item, i) => {
+    const key = `${card.id}:${i}`;
+    const intended = pendingTicks.get(key);
+    const pending = intended !== undefined && item.checked !== intended;
+    if (intended !== undefined && item.checked === intended) pendingTicks.delete(key); // the Manager applied it
+    const row = el('label', 'dodbox');
+    row.dataset.state = pending ? 'pending' : (item.checked ? 'checked' : 'open');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = pending ? intended : item.checked;
+    box.addEventListener('click', ev => {
+      ev.stopPropagation();                        // don't open the overlay
+      toggleDod(card, i, !item.checked);
+    });
+    row.appendChild(box);
+    row.appendChild(el('span', 'dodtext', item.text));
+    if (pending) row.appendChild(el('span', 'dodpending', 'pending'));
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
 function cardNode(c, byId) {
   const a = el('article', 'card');
   a.dataset.status = c.status;
@@ -160,7 +206,9 @@ function cardNode(c, byId) {
   const whoText = c.roleName || c.assigneeName || roleKey || 'unassigned';
   a.appendChild(el('div', 'who', c.reviewerName ? `${whoText} → ${c.reviewerName}` : whoText));
 
-  if (c.dod && c.dod.total > 0) {
+  if (c.shipsWhen) a.appendChild(el('div', 'ships', `ships when: ${c.shipsWhen}`));
+
+  if (c.dodItems && c.dodItems.length) {
     const pct = Math.round((c.dod.done / c.dod.total) * 100);
     const d = el('div', 'dod', `DoD ${c.dod.done}/${c.dod.total}${c.branch ? ' · ' + c.branch : ''}`);
     const bar = el('div', 'bar');
@@ -169,6 +217,7 @@ function cardNode(c, byId) {
     bar.appendChild(i);
     d.appendChild(bar);
     a.appendChild(d);
+    a.appendChild(dodList(c));
   }
 
   if (c.question) a.appendChild(el('p', 'q', c.question));
@@ -201,8 +250,8 @@ function renderBoard() {
   }
 }
 
-// Open questions addressed to the human. There is no separate queue file — a
-// question(HUMAN) card sitting in Blocked IS the queue, so this is derived.
+// Open questions addressed to the human. There is no separate queue file, and no
+// Blocked column — any card carrying a question(HUMAN) IS the queue, so this is derived.
 function humanQuestions(d) {
   return (d.cards || []).filter(c => c.questionFor === 'human' && c.question);
 }
@@ -235,6 +284,24 @@ function renderNeedsYou(d) {
   }
 }
 
+function renderIncrements(d) {
+  const host = document.getElementById('increments');
+  host.textContent = '';
+  const list = d.increments || [];
+  host.hidden = list.length === 0;
+  if (!list.length) return;
+  host.appendChild(el('h4', null,
+    currentTheme() === 'blueprint' ? 'INCREMENTS IN FLIGHT' : 'in flight'));
+  for (const inc of list) {
+    const row = el('div', 'incrow');
+    row.appendChild(el('span', 'incbranch', inc.branch));
+    row.appendChild(el('span', 'inccards', `${inc.cards.length} cards`));
+    row.appendChild(el('span', 'increles', inc.roles.join(', ')));
+    row.appendChild(el('span', 'incdod', `DoD ${inc.dod.done}/${inc.dod.total}`));
+    host.appendChild(row);
+  }
+}
+
 function renderFeed(d) {
   const host = document.getElementById('feedRows');
   host.textContent = '';
@@ -258,7 +325,7 @@ function renderTitleBlock(d) {
   const rows = [
     ['PROJECT', String(p.name || '').toUpperCase()],
     ['ROUND', `${p.round} / ${p.maxRounds}`],
-    ['PARALLEL', `${p.activeWorktrees} WORKTREES`],
+    ['PARALLEL', `${p.activeWorktrees} IN FLIGHT`],
     ['APPROVED BY', d.cards.some(c => c.questionFor === 'human') ? 'PENDING — YOU' : 'AUTO'],
   ];
   for (const [k, v] of rows) {
@@ -330,6 +397,7 @@ async function poll() {
     renderHeader(d);
     renderRail(d);
     renderNeedsYou(d);
+    renderIncrements(d);
     renderTeam(d);
     renderBoard();
     renderFeed(d);

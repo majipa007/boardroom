@@ -1,6 +1,6 @@
 # sdlc-team
 
-The plugin behind [Boardroom](https://github.com/majipa007/boardroom). It runs a software team inside Claude Code: a **manager agent** composes a project-specific roster from your brief, puts the work on a Markdown Kanban board, and specialist agents write real code in isolated git worktrees until the board is clear. Humans are asked only at defined checkpoints.
+The plugin behind [Boardroom](https://github.com/majipa007/boardroom). It runs a software team inside Claude Code: a **manager agent** composes a project-specific roster from your brief, bundles ready work into **increments**, and specialist agents build each increment together on one shared branch until the board is clear. Humans are asked only at defined checkpoints.
 
 ## Install
 
@@ -18,7 +18,7 @@ claude --plugin-dir ./sdlc-team
 claude plugin validate ./sdlc-team --strict
 ```
 
-Requires **Node.js ≥ 18** for `/sdlc-dashboard` only; everything else is Markdown + POSIX shell. `git` is required (worktrees).
+Requires **Node.js ≥ 18** for `/sdlc-dashboard` only; everything else is Markdown + POSIX shell. `git` is required (increment branches).
 
 ## Commands
 
@@ -38,8 +38,8 @@ There are exactly three shipped agents:
 | Agent | What it is |
 |---|---|
 | `manager` | The orchestrator. Sole writer of the board and the role registry. Allocates, classifies, merges, runs checkpoints. Never implements. |
-| `worker` | A generic implementer. Spawned with a role charter and one card; runs in its own git worktree. |
-| `reviewer` | A generic verifier. Spawned with a review charter (`sec-review`, `qa-verify`, …); read-only on source. |
+| `worker` | A generic implementer. Spawned with a role charter and a bundle of ready cards; builds them together on the increment's shared branch, touching only the files it was told it owns. |
+| `reviewer` | A generic verifier. Spawned with a review charter (`sec-review`, `qa-verify`, …) over an increment's combined diff; read-only on source. |
 
 **The team itself is a role registry**, kept in `.sdlc/team.md` and owned by the manager. Each
 role has a stable id (`R-01`), a charter, hard boundaries, and `conventions` that accumulate
@@ -48,16 +48,19 @@ new one only when nothing covers the need — every such decision is logged, nev
 
 Cards say `role: R-01 backend` and carry mandatory `verify-roles` derived from risk: anything
 touching auth, input parsing, secrets, dependencies or file/network handling gets
-`sec-review`; anything producing executable code gets `qa-verify`. **A card cannot reach Done
-until every verify-role has signed off in `archive/`**, and the worker that implemented a card
-never verifies it.
+`sec-review`; anything producing executable code gets `qa-verify`. **A card cannot reach
+Shipped until every verify-role has signed off in `archive/`**, and the worker that implemented
+a card never verifies it.
 
 ## How it works
 
 - **Board is the single source of truth** (`.sdlc/kanban.md`) and only the manager writes it.
-- **Workers report via `.sdlc/inbox/`** — never by editing the board. The manager processes messages oldest-first and moves them unchanged into `.sdlc/archive/`, a replayable history. Workers in a worktree commit their message onto their branch so it reaches the manager.
-- **Parallel, zero conflicts:** each worker runs in its own git worktree on branch `sdlc/<task-id>-<slug>`; the manager merges one branch at a time and turns conflicts into fix cards rather than resolving blindly.
-- **Definition of Done** lives on every card as checkboxes, each owned by the role responsible for it. A card reaches Done only when every box is checked.
+- **Work ships as increments.** Each round the manager bundles every ready card a role can own — with no file-footprint conflict against another in-flight bundle — into one increment on branch `sdlc/inc-##-<slug>`. There is no size cap; the bundle is as big as coherently ships together.
+- **No worktrees.** Every agent working an increment — the worker(s) building it and the reviewers verifying it — shares the same working directory on that one branch. Isolation comes from **explicit file ownership**: the manager tells each agent exactly which files it owns, and no agent may run `git checkout/switch/reset/stash` or `git add -A` — anything that would move HEAD or touch the shared index wholesale. Agents only `git add` their own files and commit.
+- **Workers report via `.sdlc/inbox/`** — never by editing the board. Because everyone shares the branch, an agent just writes into `.sdlc/inbox/` and commits it; no branch-hopping needed. The manager processes messages oldest-first and moves them unchanged into `.sdlc/archive/`, a replayable history.
+- **One verification gate per increment.** Once every card in an increment reports done, all of its `verify-roles` review the increment's combined diff in one parallel round — tests, review and security together, over 100% of the code. Security is never skipped: a high/critical finding still halts everything before the merge, batched per increment instead of per card.
+- **Four columns: `Next | In flight | Shipped | Killed`.** There is no Blocked column — a card carrying `question(HUMAN):` is blocked by that fact alone. `In flight` covers both building and verifying (Review folds into it). `Killed` is scope that was considered and cut, kept for the record and never dispatched.
+- **Definition of Done is capped at ~3 checkboxes** plus a one-line `ships-when:` stating the shippable outcome, each box owned by the role responsible for it. In the dashboard every box is clickable: clicking it writes an inbox message (`from: Human`, `type: dod-check`) instead of touching the board directly, and the box shows `unchecked → pending → checked` as the manager applies it on its next pass. The dashboard therefore writes only into `.sdlc/inbox/` — it never edits `kanban.md`, `team.md`, or any source file.
 - **Checkpoints** halt the loop and ask you: plan approval, sprint/phase gate, high/critical security finding, blocked escalation, round cap. A Stop hook prevents the session ending with open cards unless `.sdlc/.awaiting-human` is set.
 
 ## Autopilot
@@ -71,8 +74,8 @@ on the board as Blocked `question(HUMAN)` cards and are presented together at th
 round — the loop never halts mid-round. A failing test run blocks a merge unconditionally,
 autopilot or not.
 
-Caps keep it bounded: `parallelism` (3), `max-role-mints-per-sprint` (4) and
-`max-active-roles` (10).
+Caps keep it bounded: `parallelism` (3), `max-active-roles` (4) and
+`max-role-mints-per-sprint` (2).
 
 ## Dashboard
 

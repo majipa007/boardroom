@@ -97,7 +97,7 @@ test('buildBoardJson maps the project block', () => {
   assert.strictEqual(b.project.sprintRunning, true);
   assert.strictEqual(b.project.awaitingHuman, false);
   assert.ok(b.project.nextGate.length > 0);
-  assert.deepStrictEqual(b.columns, ['blocked', 'backlog', 'progress', 'review', 'done']);
+  assert.deepStrictEqual(b.columns, ['next', 'flight', 'shipped', 'killed']);
   assert.ok(typeof b.revision === 'string' && b.revision.length > 0);
 });
 
@@ -106,7 +106,7 @@ test('buildBoardJson maps cards onto contract statuses and fields', () => {
   const b = buildBoardJson(makeProject(base, 'demo'));
 
   const byId = Object.fromEntries(b.cards.map(c => [c.id, c]));
-  assert.strictEqual(byId['T-006'].status, 'blocked');
+  assert.strictEqual(byId['T-006'].status, 'next');
   assert.strictEqual(byId['T-006'].assignee, 'backend-developer');
   assert.strictEqual(byId['T-006'].questionFor, 'human');
   assert.strictEqual(byId['T-006'].question, 'Redis or in-memory?');
@@ -114,8 +114,8 @@ test('buildBoardJson maps cards onto contract statuses and fields', () => {
   assert.strictEqual(byId['T-006'].branch, null);
   assert.strictEqual(byId['T-006'].reviewer, null);
 
-  assert.strictEqual(byId['T-009'].status, 'backlog');
-  assert.strictEqual(byId['T-005'].status, 'progress');
+  assert.strictEqual(byId['T-009'].status, 'next');
+  assert.strictEqual(byId['T-005'].status, 'flight');
   assert.strictEqual(byId['T-005'].branch, 'sdlc/T-005-groups');
   assert.deepStrictEqual(byId['T-005'].dod, { done: 1, total: 2 });
   for (const c of b.cards) assert.ok(['high', 'med', 'low'].includes(c.priority));
@@ -328,8 +328,9 @@ test('caps and autopilot fall back when the config omits them', () => {
   fs.writeFileSync(path.join(dir, '.sdlc', 'project-config.md'),
     '# Project Config\n- project: Bare\n- methodology: agile\n');
   const b = buildBoardJson(dir);
-  assert.strictEqual(b.project.maxRoleMints, 4);
-  assert.strictEqual(b.project.maxActiveRoles, 10);
+  // startup defaults, matching the shipped project-config template
+  assert.strictEqual(b.project.maxRoleMints, 2);
+  assert.strictEqual(b.project.maxActiveRoles, 4);
   assert.strictEqual(b.project.autopilot, 'off');
 });
 
@@ -342,4 +343,112 @@ test('a legacy roster project still produces a team and a usable role key', () =
     assert.strictEqual(typeof c.role, 'string');
     assert.strictEqual(c.assignee, c.role);
   }
+});
+
+const RAD_BOARD2 = `# Kanban — rad2
+> methodology: rad | phase: Increment 1
+> last-updated: x | round: 2
+
+## Next
+
+### T-020 | Not started
+- role: R-01 backend
+
+## In flight
+
+### T-021 | Auth routes
+- role: R-01 backend
+- branch: sdlc/inc-01-core
+- ships-when: auth endpoints live and green.
+- definition-of-done:
+  - [x] routes
+  - [ ] tests
+
+### T-022 | Auth screens
+- role: R-02 frontend
+- branch: sdlc/inc-01-core
+- definition-of-done:
+  - [ ] screens
+
+## Shipped
+
+### T-001 | Scaffold
+- role: R-01 backend
+- branch: sdlc/inc-00-scaffold
+
+## Killed
+
+### T-099 | Speculative export
+- role: R-01 backend
+`;
+
+function makeRadProject(base, name) {
+  const dir = path.join(base, name);
+  const sdlc = path.join(dir, '.sdlc');
+  fs.mkdirSync(path.join(sdlc, 'archive'), { recursive: true });
+  fs.mkdirSync(path.join(sdlc, 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(sdlc, 'kanban.md'), RAD_BOARD2);
+  fs.writeFileSync(path.join(sdlc, 'team.md'),
+    '# Role Registry\n\n## R-01 · backend\n- charter: Owns api/**.\n- status: active\n- history: 1 cards completed, 0 rework\n\n## R-02 · frontend\n- charter: Owns app/**.\n- status: active\n- history: 0 cards completed, 0 rework\n');
+  fs.writeFileSync(path.join(sdlc, 'project-config.md'),
+    '# Project Config\n- project: Rad2\n- methodology: rad\n- parallelism: 3\n- max-active-roles: 4\n');
+  return dir;
+}
+
+test('statuses use the RAD keys', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-'));
+  const b = buildBoardJson(makeRadProject(base, 'r'));
+  assert.deepStrictEqual(b.columns, ['next', 'flight', 'shipped', 'killed']);
+  const byId = Object.fromEntries(b.cards.map(c => [c.id, c]));
+  assert.strictEqual(byId['T-020'].status, 'next');
+  assert.strictEqual(byId['T-021'].status, 'flight');
+  assert.strictEqual(byId['T-001'].status, 'shipped');
+  assert.strictEqual(byId['T-099'].status, 'killed');
+});
+
+test('cards carry dodItems and shipsWhen', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-'));
+  const b = buildBoardJson(makeRadProject(base, 'r'));
+  const c = b.cards.find(x => x.id === 'T-021');
+  assert.deepStrictEqual(c.dodItems, [
+    { text: 'routes', checked: true },
+    { text: 'tests', checked: false },
+  ]);
+  assert.strictEqual(c.shipsWhen, 'auth endpoints live and green.');
+  assert.deepStrictEqual(c.dod, { done: 1, total: 2 });
+});
+
+test('increments group in-flight cards by branch', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-'));
+  const b = buildBoardJson(makeRadProject(base, 'r'));
+  assert.strictEqual(b.increments.length, 1, 'only the in-flight branch counts');
+  const inc = b.increments[0];
+  assert.strictEqual(inc.branch, 'sdlc/inc-01-core');
+  assert.deepStrictEqual(inc.cards.sort(), ['T-021', 'T-022']);
+  assert.deepStrictEqual(inc.roles.sort(), ['R-01', 'R-02']);
+  assert.deepStrictEqual(inc.dod, { done: 1, total: 3 });
+});
+
+test('a legacy board maps onto the RAD statuses', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-'));
+  const dir = makeProject(base, 'legacy');      // existing legacy helper
+  const b = buildBoardJson(dir);
+  assert.deepStrictEqual(b.columns, ['next', 'flight', 'shipped', 'killed']);
+  for (const c of b.cards) assert.ok(['next', 'flight', 'shipped', 'killed'].includes(c.status));
+});
+
+test('an assigned-but-not-started card counts toward its increment', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-'));
+  const dir = makeRadProject(base, 'assigned');
+  const board = path.join(dir, '.sdlc', 'kanban.md');
+  // a bundle can be assigned (branch set) while the card is still in Next
+  fs.writeFileSync(board, fs.readFileSync(board, 'utf8').replace(
+    '### T-020 | Not started\n- role: R-01 backend',
+    '### T-020 | Not started\n- role: R-01 backend\n- branch: sdlc/inc-01-core'));
+
+  const b = buildBoardJson(dir);
+  assert.strictEqual(b.cards.find(c => c.id === 'T-020').status, 'next');
+  const inc = b.increments.find(i => i.branch === 'sdlc/inc-01-core');
+  assert.ok(inc.cards.includes('T-020'), 'a next card with a branch joins its increment');
+  assert.deepStrictEqual(inc.cards.sort(), ['T-020', 'T-021', 'T-022']);
 });

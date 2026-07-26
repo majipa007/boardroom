@@ -5,13 +5,14 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { parseArgs, createServer } = require('../dashboard');
+const { writeDodCheck } = require('../lib/inbox-write');
 
 function makeProject(base, name) {
   const dir = path.join(base, name);
   const sdlc = path.join(dir, '.sdlc');
   fs.mkdirSync(sdlc, { recursive: true });
   fs.writeFileSync(path.join(sdlc, 'kanban.md'),
-    '# Kanban — ' + name + '\n> methodology: agile | phase: Sprint 1\n> last-updated: x | round: 1\n\n## Backlog\n### T-001 | do it\n- assignee: Marcus\n\n## Done\n');
+    '# Kanban — ' + name + '\n> methodology: agile | phase: Sprint 1\n> last-updated: x | round: 1\n\n## Backlog\n### T-001 | do it\n- assignee: Marcus\n- definition-of-done:\n  - [ ] one\n\n## Done\n');
   fs.writeFileSync(path.join(sdlc, 'team.md'),
     '| Name | Role |\n|------|------|\n| Marcus | Backend Developer |\n');
   return dir;
@@ -36,7 +37,7 @@ test('GET /board.json returns the contract payload with a rail', async () => {
     assert.match(r.headers.get('content-type'), /application\/json/);
     const b = await r.json();
     assert.ok(b.project, 'has a selected project');
-    assert.deepStrictEqual(b.columns, ['blocked', 'backlog', 'progress', 'review', 'done']);
+    assert.deepStrictEqual(b.columns, ['next', 'flight', 'shipped', 'killed']);
     assert.strictEqual(b.projects.length, 2);
     assert.ok(typeof b.revision === 'string' && b.revision.length > 0);
 
@@ -91,4 +92,113 @@ test('unknown paths 404 and traversal is refused', async () => {
   } finally {
     await new Promise(res => server.close(res));
   }
+});
+
+test('writeDodCheck writes one schema-valid inbox message', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dodw-'));
+  const dir = makeProject(base, 'alpha');
+  const file = writeDodCheck({ projectDir: dir, cardId: 'T-001', index: 0, checked: true, boxText: 'compose up works' });
+
+  assert.ok(file.startsWith(path.join(dir, '.sdlc', 'inbox')), 'writes inside .sdlc/inbox only');
+  const body = fs.readFileSync(file, 'utf8');
+  assert.match(body, /^---\n/);
+  assert.match(body, /^from: Human$/m);
+  assert.match(body, /^task: T-001$/m);
+  assert.match(body, /^type: dod-check$/m);
+  assert.match(body, /## Summary/);
+  assert.match(body, /compose up works/);
+  assert.match(body, /## Requested board changes/);
+});
+
+test('POST /api/dod writes a message and never touches the board', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dodw-'));
+  const dir = makeProject(base, 'alpha');
+  const boardBefore = fs.readFileSync(path.join(dir, '.sdlc', 'kanban.md'), 'utf8');
+  const reg = path.join(base, 'registry.json');
+  const server = createServer({ root: base, registryPath: reg });
+  await new Promise(res => server.listen(0, '127.0.0.1', res));
+  const port = server.address().port;
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/dod`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: 'alpha', card: 'T-001', index: 0, checked: true }),
+    });
+    assert.strictEqual(r.status, 200);
+    const out = await r.json();
+    assert.strictEqual(out.ok, true);
+    assert.ok(fs.existsSync(out.file), 'the message file exists');
+
+    assert.strictEqual(fs.readFileSync(path.join(dir, '.sdlc', 'kanban.md'), 'utf8'), boardBefore,
+      'the board is byte-identical — the dashboard never writes it');
+  } finally {
+    await new Promise(res => server.close(res));
+  }
+});
+
+test('POST /api/dod rejects an unknown project and a bad body', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dodw-'));
+  makeProject(base, 'alpha');
+  const reg = path.join(base, 'registry.json');
+  const server = createServer({ root: base, registryPath: reg });
+  await new Promise(res => server.listen(0, '127.0.0.1', res));
+  const port = server.address().port;
+  const post = (body) => fetch(`http://127.0.0.1:${port}/api/dod`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+  });
+  try {
+    assert.strictEqual((await post(JSON.stringify({ project: '../etc', card: 'T-001', index: 0 }))).status, 400);
+    assert.strictEqual((await post('not json')).status, 400);
+    assert.strictEqual((await post(JSON.stringify({ project: 'alpha' }))).status, 400);
+    assert.strictEqual((await fetch(`http://127.0.0.1:${port}/api/dod`)).status, 404, 'GET is not the write path');
+  } finally {
+    await new Promise(res => server.close(res));
+  }
+});
+
+test('two ticks on one card in the same second do not overwrite each other', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dodc-'));
+  const dir = makeProject(base, 'alpha');
+  const now = '2026-07-26T10:00:00Z';                 // same timestamp for both
+  const a = writeDodCheck({ projectDir: dir, cardId: 'T-001', index: 0, checked: true, boxText: 'one', now });
+  const b = writeDodCheck({ projectDir: dir, cardId: 'T-001', index: 1, checked: true, boxText: 'two', now });
+
+  assert.notStrictEqual(a, b, 'different boxes must produce different files');
+  assert.strictEqual(fs.readdirSync(path.join(dir, '.sdlc', 'inbox')).length, 2);
+  assert.match(fs.readFileSync(a, 'utf8'), /box 1/);
+  assert.match(fs.readFileSync(b, 'utf8'), /box 2/);
+
+  // re-toggling the SAME box in the same second is last-state-wins, by design
+  const again = writeDodCheck({ projectDir: dir, cardId: 'T-001', index: 0, checked: false, boxText: 'one', now });
+  assert.strictEqual(again, a, 'same box + same second reuses the filename');
+  assert.strictEqual(fs.readdirSync(path.join(dir, '.sdlc', 'inbox')).length, 2);
+  assert.match(fs.readFileSync(a, 'utf8'), /un-ticked/);
+});
+
+test('POST /api/dod refuses a traversing card id and a bad index', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'trav-'));
+  const dir = makeProject(base, 'proj');
+  const reg = path.join(base, 'registry.json');
+  const server = createServer({ root: base, registryPath: reg });
+  await new Promise(res => server.listen(0, '127.0.0.1', res));
+  const port = server.address().port;
+  const post = (body) => fetch(`http://127.0.0.1:${port}/api/dod`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  try {
+    const t = await post({ project: 'proj', card: '../../../../../OUTSIDE/pwned', index: 0, checked: true });
+    assert.strictEqual(t.status, 400, 'a traversing card id must be refused');
+    assert.strictEqual((await post({ project: 'proj', card: 'T-001', index: -1 })).status, 400);
+    assert.strictEqual((await post({ project: 'proj', card: 'T-001', index: 999 })).status, 400);
+    assert.strictEqual((await post({ project: 'proj', card: 'NO-SUCH', index: 0 })).status, 400);
+    // nothing was created anywhere above the project
+    assert.ok(!fs.existsSync(path.join(base, 'OUTSIDE')), 'no file escaped the project tree');
+  } finally { await new Promise(res => server.close(res)); }
+});
+
+test('writeDodCheck itself refuses to escape .sdlc/inbox', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'trav2-'));
+  const dir = makeProject(base, 'proj');
+  assert.throws(() => writeDodCheck({ projectDir: dir, cardId: '../../escape', index: 0, checked: true }));
+  assert.throws(() => writeDodCheck({ projectDir: dir, cardId: 'T-001', index: -1, checked: true }));
 });

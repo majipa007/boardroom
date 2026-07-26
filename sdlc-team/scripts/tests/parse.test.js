@@ -411,3 +411,65 @@ test('the shipped team.md template is an empty registry', () => {
   assert.deepStrictEqual(parseRoleRegistry(tpl), [],
     'the commented example must not parse as a real role');
 });
+
+const RAD_BOARD = `# Kanban — rad
+> methodology: rad | phase: Increment 2
+> last-updated: x | round: 3
+
+## Next
+
+### T-014 | JWT refresh
+- role: R-01 backend
+- ships-when: POST /auth/refresh rotates tokens and the suite is green.
+- definition-of-done:
+  - [x] endpoint returns 200/401/403
+  - [ ] tests green
+
+## In flight
+
+### T-015 | Groups API
+- role: R-01 backend
+- branch: sdlc/inc-02-auth
+
+## Shipped
+
+### T-001 | Scaffold
+- role: R-01 backend
+- branch: sdlc/inc-01-foundation
+
+## Killed
+
+### T-099 | Speculative export feature
+- role: R-01 backend
+`;
+
+test('parseKanban reads the RAD column set', () => {
+  const { board } = parseKanban(RAD_BOARD);
+  assert.deepStrictEqual(Object.keys(board), ['Next', 'In flight', 'Shipped', 'Killed']);
+  assert.strictEqual(board['Next'][0].id, 'T-014');
+  assert.strictEqual(board['In flight'][0].id, 'T-015');
+  assert.strictEqual(board['Shipped'][0].id, 'T-001');
+  assert.strictEqual(board['Killed'][0].id, 'T-099');
+});
+
+test('parseKanban still reads a legacy 5-column board', () => {
+  const { board } = parseKanban(RICH_KANBAN);   // legacy fixture already in this file
+  assert.ok(board['Backlog'], 'legacy Backlog present');
+  assert.ok(board['Blocked'], 'legacy Blocked present');
+  assert.strictEqual(board['Backlog'][0].id, 'T-009');
+});
+
+test('cards expose dodItems in file order and ships-when', () => {
+  const { board } = parseKanban(RAD_BOARD);
+  const c = board['Next'][0];
+  assert.strictEqual(c.shipsWhen, 'POST /auth/refresh rotates tokens and the suite is green.');
+  assert.deepStrictEqual(c.dodItems, [
+    { text: 'endpoint returns 200/401/403', checked: true },
+    { text: 'tests green', checked: false },
+  ]);
+  assert.deepStrictEqual(c.dod, { done: 1, total: 2 }, 'counts stay consistent with dodItems');
+
+  const shipped = board['Shipped'][0];
+  assert.deepStrictEqual(shipped.dodItems, []);
+  assert.strictEqual(shipped.shipsWhen, '');
+});

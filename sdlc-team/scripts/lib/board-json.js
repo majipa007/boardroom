@@ -4,13 +4,13 @@ const path = require('path');
 const { parseProject, slugify, parseAgentRef, parseRoleRef } = require('./parse');
 
 const STATUS_BY_COLUMN = {
-  'Blocked': 'blocked',
-  'Backlog': 'backlog',
-  'In Progress': 'progress',
-  'Review': 'review',
-  'Done': 'done',
+  // RAD
+  'Next': 'next', 'In flight': 'flight', 'Shipped': 'shipped', 'Killed': 'killed',
+  // legacy boards fold onto the same four
+  'Blocked': 'next', 'Backlog': 'next', 'In Progress': 'flight',
+  'Review': 'flight', 'Done': 'shipped',
 };
-const COLUMNS = ['blocked', 'backlog', 'progress', 'review', 'done'];
+const COLUMNS = ['next', 'flight', 'shipped', 'killed'];
 
 // The spec's six sticky-note colours. Assigned by hash of the agent id rather than
 // by name, so any dynamically composed role gets a stable colour.
@@ -67,6 +67,23 @@ function hashPayload(payload) {
     .digest('hex');
 }
 
+// One entry per distinct branch among cards still in flight — the branch IS the
+// increment, so this is derived rather than stored on the card.
+function buildIncrements(cards) {
+  const by = new Map();
+  for (const c of cards) {
+    if (c.status === 'shipped' || c.status === 'killed') continue;
+    if (!c.branch) continue;
+    if (!by.has(c.branch)) by.set(c.branch, { branch: c.branch, cards: [], roles: [], dod: { done: 0, total: 0 } });
+    const inc = by.get(c.branch);
+    inc.cards.push(c.id);
+    if (c.role && !inc.roles.includes(c.role)) inc.roles.push(c.role);
+    inc.dod.done += c.dod.done;
+    inc.dod.total += c.dod.total;
+  }
+  return [...by.values()];
+}
+
 function buildBoardJson(projectDir) {
   const p = parseProject(projectDir);
 
@@ -89,6 +106,8 @@ function buildBoardJson(projectDir) {
         question: c.question || '',
         questionFor: c.questionFor || '',
         dod: { done: c.dod.done, total: c.dod.total },
+        dodItems: c.dodItems || [],
+        shipsWhen: c.shipsWhen || '',
         branch: c.branch || null,
         reviewer: c.reviewer ? c.reviewer.id : null,
         reviewerName: c.reviewer ? c.reviewer.name : null,
@@ -98,8 +117,8 @@ function buildBoardJson(projectDir) {
     }
   }
 
-  const inProgress = cards.filter(c => c.status === 'progress');
-  const busyBy = new Map(inProgress.map(c => [c.role, c.id]));
+  const inFlight = cards.filter(c => c.status === 'flight');
+  const busyBy = new Map(inFlight.map(c => [c.role, c.id]));
 
   // Registry roles when the project has one; legacy roster otherwise.
   const team = (p.roles && p.roles.length)
@@ -134,7 +153,8 @@ function buildBoardJson(projectDir) {
 
   // Derived — the markdown carries no explicit field for these.
   const awaitingHuman = p.awaitingHuman;
-  const activeWorktrees = inProgress.length;
+  // RAD has no worktrees any more; the field name is kept for payload compatibility.
+  const activeWorktrees = inFlight.length;
   const sprintRunning = activeWorktrees > 0 && !awaitingHuman;
 
   const activity = p.archive
@@ -157,8 +177,8 @@ function buildBoardJson(projectDir) {
       round: p.round,
       maxRounds: numOr(p.config['max-rounds-per-sprint'], 20),
       parallelism: numOr(p.config.parallelism, 3),
-      maxRoleMints: numOr(p.config['max-role-mints-per-sprint'], 4),
-      maxActiveRoles: numOr(p.config['max-active-roles'], 10),
+      maxRoleMints: numOr(p.config['max-role-mints-per-sprint'], 2),
+      maxActiveRoles: numOr(p.config['max-active-roles'], 4),
       autopilot: String(p.config.autopilot || 'off').toLowerCase() === 'on' ? 'on' : 'off',
       activeWorktrees,
       sprintRunning,
@@ -168,6 +188,7 @@ function buildBoardJson(projectDir) {
     team,
     columns: COLUMNS.slice(),
     cards,
+    increments: buildIncrements(cards),
     activity,
   };
 
@@ -186,6 +207,7 @@ function buildPayload(projectDirs, selectedId) {
       team: [],
       columns: COLUMNS.slice(),
       cards: [],
+      increments: [],
       activity: [],
       error: 'No SDLC projects found. Run /sdlc-init in a project, or start the dashboard with --root <dir>.',
     };

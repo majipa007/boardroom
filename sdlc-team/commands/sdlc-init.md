@@ -6,17 +6,15 @@ Load the `sdlc-board` skill for all schemas and templates.
 
 1. **Interview the human.** Ask, concisely: what are we building, key constraints, deadline shape, and any compliance needs.
 
-2. **Methodology (the Manager auto-selects).** Based on the brief, the Manager chooses the methodology using this guide, and writes both the choice and a written justification into `project-config.md`'s `methodology` and `methodology-reasoning` fields:
-   - Requirements vague / expected to evolve, iterative feedback OK → **agile** (sprints; sprint reviews are the gates).
-   - Continuous small stream of tasks, no natural sprint rhythm → **kanban** (no sprints; gate every N completed cards or a human-set cadence).
-   - Requirements fixed & fully known, compliance/contractual, hard sequential dependencies → **waterfall** (phase gates: Requirements → Design → Implementation → Verification → Release).
-   - Fixed core spec + exploratory feature layer → **hybrid** (waterfall skeleton, agile inside Implementation).
-   - Signals mixed → default to **agile**.
+2. **Methodology.** Use **RAD** — build a major part, then test/review/security it as one gate,
+   then cut over and repeat. Write `methodology: rad` and a one-line reason into
+   `project-config.md`. The only alternative is `waterfall`, and only for a genuinely fixed-spec
+   compliance project; the human can switch with `/sdlc-override waterfall`.
 
-   The methodology controls only how the Manager batches work, where gates fall, and what a "round" means — the queue/board mechanics never change. The human may override the choice at Checkpoint 1 (step 5) or later via `/sdlc-override`.
+   The methodology controls only how the Manager bundles work into increments and where gates fall — the queue/board mechanics never change. The human may override the choice at Checkpoint 1 (step 5) or later via `/sdlc-override`.
 
 3. **Scaffold `.sdlc/`** by copying the skill's `templates/` and filling placeholders:
-   - `.sdlc/project-config.md` — project name, today's date, `methodology: agile`, defaults kept.
+   - `.sdlc/project-config.md` — project name, today's date, `methodology: rad`, defaults kept.
    - `.sdlc/team.md` — copied verbatim.
    - `.sdlc/kanban.md` — header filled (project name, methodology, `round: 0`), all columns empty.
    - Create empty `.sdlc/inbox/` and `.sdlc/archive/` directories, each with a `.gitkeep`.
@@ -28,7 +26,7 @@ Load the `sdlc-board` skill for all schemas and templates.
      `R-##` id, name, charter, boundaries, a `conventions` seed, `status: active`, `minted`,
      and `history: 0 cards completed, 0 rework`. Always include a `sec-review` role and a
      `qa-verify` role, since classification attaches them to most cards.
-   - Decompose the brief into the initial backlog under `## Backlog`: at least 3 well-formed
+   - Decompose the brief into the initial backlog under `## Next`: at least 3 well-formed
      cards, each with a full Definition of Done, a `T-###` id starting at `T-001`, a
      `role: R-## <name>`, and `verify-roles` set from the classification table in the skill.
    The manager is the only agent that writes `kanban.md` and `team.md`.

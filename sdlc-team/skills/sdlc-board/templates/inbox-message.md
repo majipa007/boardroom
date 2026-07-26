@@ -8,7 +8,7 @@ timestamp: <ISO timestamp>
 <what happened>
 
 ## Requested board changes
-- <e.g. move T-### → Review>
+- <e.g. move T-### → In flight>
 
 ## Notes for others
 - note(<Name>): <message>
