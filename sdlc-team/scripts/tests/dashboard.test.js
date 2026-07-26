@@ -36,7 +36,7 @@ test('GET /board.json returns the contract payload with a rail', async () => {
     assert.match(r.headers.get('content-type'), /application\/json/);
     const b = await r.json();
     assert.ok(b.project, 'has a selected project');
-    assert.deepStrictEqual(b.columns, ['blocked', 'backlog', 'progress', 'review', 'done']);
+    assert.deepStrictEqual(b.columns, ['next', 'flight', 'shipped', 'killed']);
     assert.strictEqual(b.projects.length, 2);
     assert.ok(typeof b.revision === 'string' && b.revision.length > 0);
 
