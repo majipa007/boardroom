@@ -1,5 +1,11 @@
 # project.md — SDLC Automation Plugin for Claude Code
 
+> **Historical document.** This is the original v1 build spec, kept for history. It predates
+> the dynamic-roles/autopilot work: the six-persona table, `assignee:`-based cards, per-persona
+> agent files under `.claude/agents/`, and the "Sofia halts the loop" checkpoint flow are all
+> **superseded**. For current behaviour see `docs/dynamic-roles-spec.md` (roles, registry,
+> autopilot) and `docs/dashboard-ui-spec.md` (dashboard UI).
+
 > **Purpose of this document:** This is the complete build specification for a Claude Code plugin
 > called `sdlc-team`. Hand this file to Claude Code and build the plugin milestone by milestone
 > (see §12 Build Roadmap). Everything needed — architecture, file schemas, agent prompts,
@@ -394,7 +400,10 @@ Safety rails:
 
 ## 11. Non-goals for v1 (explicitly out of scope)
 
-- ~~Dynamic team composition (adding/removing personas at runtime).~~ **Superseded (2026-07-25): the manager now composes a project-specific roster and writes specialist agent files at init; see docs/superpowers/plans/2026-07-25-dynamic-team.md.**
+- ~~Dynamic team composition (adding/removing personas at runtime).~~ **Superseded twice: the
+  manager first composed per-project specialists (2026-07-25), and now maintains a runtime
+  role registry with mandatory risk-based verification and an autopilot loop — see
+  docs/dynamic-roles-spec.md and docs/superpowers/plans/2026-07-25-dynamic-roles-autopilot.md.**
 - External integrations (GitHub Issues sync, Slack, CI providers) — the board is self-contained.
 - Sofia writing fixes herself (she only proposes tasks).
 - Multiple concurrent sprints/boards per repo.

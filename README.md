@@ -13,7 +13,7 @@
   <a href="#install">Install</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="#how-it-works">How it works</a> ·
-  <a href="#the-team">The team</a> ·
+  <a href="#roles-minted-on-demand">Roles</a> ·
   <a href="#commands">Commands</a> ·
   <a href="#dashboard">Dashboard</a>
 </p>
@@ -22,7 +22,7 @@
 
 ## What it is
 
-You describe what you want built. Boardroom stands up a **manager agent** that reads the brief, decides which specialists the job needs, writes those specialists into your project as real agents, and puts the work on a Markdown Kanban board at `.sdlc/kanban.md`.
+You describe what you want built. Boardroom stands up a **manager agent** that reads the brief, decides which specialists the job needs, and keeps them as a **role registry** — spawning a generic `worker` or `reviewer` with that role's charter injected, rather than writing agent files or restarting anything — while it puts the work on a Markdown Kanban board at `.sdlc/kanban.md`.
 
 Then it runs the project. Each round, specialists claim their cards, **write real code in your repository** — each in its own git worktree, so they run in parallel without stepping on each other — and report back. The manager reviews, merges, re-plans, and comes back to you only at checkpoints that matter.
 
@@ -79,7 +79,7 @@ From inside the repository you want built:
 ```
 /sdlc-init
 ```
-Answer a few questions about the project. The manager picks a methodology, composes the team, drafts the backlog, and **stops for your approval**. (First run creates `.claude/agents/` — restart Claude Code once so the new specialists load.)
+Answer a few questions about the project. The manager picks a methodology, composes the role registry, drafts the backlog, and **stops for your approval**.
 
 ```
 /sprint
@@ -123,12 +123,18 @@ The rules that make it hold together:
 - **Parallel, isolated, merged deliberately.** Each worker gets its own git worktree and branch (`sdlc/T-014-jwt-refresh`). The manager merges one branch at a time in approval order; a merge conflict becomes a **fix card**, never a blind resolution.
 - **Done is mechanical.** Every card carries a Definition of Done as checkboxes, and a box may only be checked by the role that owns it — QA owns test boxes, the security reviewer owns security boxes, the implementer owns implementation boxes. A card reaches Done only when every box is checked.
 - **The session can't quietly abandon work.** A Stop hook blocks the session from ending while cards are still open, unless the board is legitimately waiting on you.
+- **Roles, not people.** The manager keeps a role registry and spawns a generic `worker` or
+  `reviewer` with the role's charter injected — so a new specialist costs a registry entry,
+  not a restart.
+- **Autopilot.** With `autopilot: on` the loop runs continuously and halts only on five hard
+  stops; everything else is logged as an auto-decision.
 
 ### Anatomy of a card
 
 ```markdown
 ### T-014 | Implement JWT refresh endpoint
-- assignee: Backend Developer
+- role: R-01 backend
+- verify-roles: [R-04 sec-review, R-05 qa-verify]
 - priority: high
 - depends-on: [T-011]
 - branch: sdlc/T-014-jwt-refresh
@@ -137,8 +143,8 @@ The rules that make it hold together:
     return a new access+refresh pair. Follow the error envelope in src/api/errors.ts.
 - definition-of-done:
   - [ ] Endpoint returns correct status codes (200/401/403)
-  - [ ] Unit + integration tests passing        (QA verifies)
-  - [ ] No new high/critical findings           (Security signs off)
+  - [ ] Unit + integration tests passing        (qa-verify verifies)
+  - [ ] No new high/critical findings           (sec-review signs off)
   - [ ] Branch merges cleanly to main           (Manager verifies)
 - status-log:
   - 2026-07-25T10:02 created
@@ -150,41 +156,35 @@ The rules that make it hold together:
 ```
 .sdlc/
 ├── kanban.md           # THE BOARD — manager writes, everyone reads
-├── team.md             # the composed roster + role boundaries
+├── team.md             # the role registry + role boundaries
 ├── project-config.md   # methodology, checkpoints, decision log
 ├── inbox/              # worker → manager messages, awaiting processing
 └── archive/            # processed messages, verbatim (project history)
-
-.claude/agents/         # the specialists the manager wrote for this project
 ```
 
 Commit `.sdlc/` — it *is* your project-management record.
 
 ---
 
-## The team
+## Roles, minted on demand
 
-Three roles are always present, and ship with the plugin:
+Three agents ship: `manager` (orchestrates, owns the board), `worker` (implements one card in
+its own worktree), `reviewer` (verifies, read-only on source).
 
-| Agent | Role | Writes code? | Hard boundary |
-|---|---|---|---|
-| `manager` | Manager / Orchestrator | No | The only writer of the board. Decomposes, assigns, merges, runs checkpoints, composes the team. Never implements features. |
-| `security-reviewer` | Security | No | Reviews branch diffs, rates findings `low`→`critical`, files fixes as proposed tasks. High/critical **halts the loop**. Never fixes code itself. |
-| `qa-engineer` | QA | Tests only | Runs and writes tests, verifies DoD boxes, signs off cards. Never modifies non-test source. |
-
-**Everything else is composed for your project.** There is no fixed developer list. At `/sdlc-init` the manager reads your brief and creates exactly the specialists it needs — writing each one as a real agent file into `.claude/agents/<role>.md`, with its own scope and hard "you do not touch this" boundaries, and recording the roster in `.sdlc/team.md`.
+The team is a **role registry** in `.sdlc/team.md` that the manager grows as the project
+needs it — each role has a stable id, a charter, hard boundaries, and conventions that
+accumulate over time:
 
 ```
-brief: "iOS app, ML recommender, and a REST API behind it"
-
-composed roster:
-  manager · security-reviewer · qa-engineer     (always)
-  ios-developer                                 ← invented for this project
-  ml-engineer                                   ←
-  backend-developer                             ←
+card needs "rotate refresh tokens"
+  -> registry scan: R-01 backend covers it        -> reuse, no mint
+card needs "train a recommender"
+  -> nothing covers it                            -> mint R-06 ml, log the decision
 ```
 
-A brief with no UI gets no frontend role. A data pipeline project gets a data engineer. If a card later needs a specialist that doesn't exist yet, the manager creates that role mid-project (hot-loaded, no restart).
+Reuse beats minting, charter edits beat replacements, and retired roles are kept so history
+still resolves. Every card carries mandatory `verify-roles` chosen by risk class, and cannot
+reach Done until each has signed off — with the implementer never allowed to be the verifier.
 
 ---
 
@@ -212,13 +212,31 @@ The manager picks one from your brief, writes down *why*, and you can override i
 
 Methodology changes how work is batched and where gates fall. The board and queue mechanics never change.
 
-### Checkpoints — where it stops and asks you
+### Checkpoints (normal mode) — where it stops and asks you
 
 1. **Plan approval** — nothing is written until you approve the methodology and backlog.
 2. **Sprint / phase gate** — end of a sprint, phase, or every N cards.
 3. **Security escalation** — any high/critical finding halts the loop immediately.
 4. **Blocked escalation** — a card explicitly asking for you, or blocked two rounds running.
 5. **Round cap** — hits `max-rounds-per-sprint` (default 20) with work still open.
+
+### Hard stops (autopilot) — the only five things that halt it
+
+With `autopilot: on` (or `/sprint --auto`), the five checkpoints above stop being individual
+stops. Only these five halt the loop, and only at a round boundary:
+
+1. **Init approval** — the initial plan has not been approved yet.
+2. **High/critical security finding** — any escalation from a security-review role.
+3. **Open `question(HUMAN)`** — questions raised mid-round are not queued to a file; they stay
+   on the board as Blocked `question(HUMAN)` cards and are presented together at the end of
+   the round.
+4. **Round cap** — `max-rounds-per-sprint` (default 20) reached with work still open.
+5. **Completion** — every card is in Done.
+
+A sprint/phase gate and a blocked escalation no longer stop the loop in autopilot — the
+former emits a gate report and continues, the latter is queued like a `question(HUMAN)`.
+Everything else (role mints, charter edits, allocation, serialization, fix cards) is an
+auto-decision logged to the Decision Log.
 
 ---
 
@@ -260,7 +278,7 @@ boardroom/
 ├── .claude-plugin/marketplace.json   # makes this repo installable
 ├── sdlc-team/                        # the plugin
 │   ├── .claude-plugin/plugin.json
-│   ├── agents/                       # manager, security-reviewer, qa-engineer
+│   ├── agents/                       # manager, worker, reviewer
 │   ├── commands/                     # the /sdlc-* commands
 │   ├── skills/sdlc-board/            # board schemas + templates
 │   ├── hooks/                        # Stop hook

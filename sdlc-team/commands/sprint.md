@@ -1,26 +1,94 @@
 ---
-description: Run the SDLC orchestration loop — manager pass then worker dispatch, repeating until the board is clear or a checkpoint fires.
-argument-hint: [rounds]
+description: Run the SDLC orchestration loop — manager pass then role dispatch, repeating until the board is clear or a hard stop fires.
+argument-hint: "[rounds] [--auto]"
 ---
 
-Optional argument `$1` = number of rounds to run before pausing (default: run until Done or a checkpoint).
+Arguments: an optional round count (e.g. `/sprint 5`) and an optional `--auto` to force
+autopilot for this run. Autopilot is otherwise controlled by `autopilot: on|off` in
+`.sdlc/project-config.md` (default `off`). `[rounds]` is just a user-set bound on how many
+rounds this invocation runs before returning control to you — it is not a sixth hard stop;
+the round-cap hard stop below is the separate, config-driven `max-rounds-per-sprint` limit.
 
-Repeat until (all cards are in Done) OR (a checkpoint fires) OR (the round cap is reached) OR ($1 rounds have run):
+**Normal mode** stops at every checkpoint and asks you. **Autopilot** keeps going, logging
+its decisions, and halts only on a hard stop.
+
+Repeat until a hard stop fires, the board is all Done, the round cap is reached, or the
+requested number of rounds has run:
 
 **ROUND n:**
 
-1. **Manager pass (sequential, sole board writer).** Invoke the `manager` agent. It drains the inbox → archive, updates the board, processes Blocked first, merges approved branches, (re)assigns cards, and detects checkpoint conditions. If a checkpoint fires, it writes `.sdlc/.awaiting-human`, presents a summary, and you STOP — ask the human and wait.
+1. **Manager pass (sequential, sole board writer).** Invoke the `manager` agent. Tell it in
+   the spawn prompt the effective autopilot state for this run — `on` if `--auto` was passed,
+   otherwise whatever `autopilot:` reads in `project-config.md` — so it knows which of its two
+   checkpoint branches to run. It drains the inbox → archive, updates the board, processes
+   Blocked first, checks that every card's `verify-roles` have signed off before allowing
+   Done, merges approved branches (a reported failing test run blocks the merge
+   unconditionally), allocates roles to ready cards (reuse → extend → mint, per its registry
+   rules), and records every auto-decision in the Decision Log.
 
-2. **Dispatch (parallel).** Collect the set of distinct team members (from `.sdlc/team.md`) that now have an actionable card assigned to them (a Backlog/In Progress card, or a Review card awaiting their sign-off) whose `depends-on` cards are all Done. These may be the always-on `security-reviewer`/`qa-engineer` or any project-composed specialist (its agent name is its `.claude/agents/<slug>.md` `name`). Spawn up to `parallelism` (from `project-config.md`, default 3) worker subagents IN PARALLEL — one Task-tool invocation per agent, batched in a single message so they run concurrently. Each worker: its own worktree (`isolation: worktree`), works exactly ONE card, writes inbox message(s), and terminates.
+2. **Dispatch (parallel).** From `.sdlc/team.md` and the board, collect the ready work: cards
+   in Backlog/In Progress whose `depends-on` are all Done, and cards in Review awaiting a
+   `verify-roles` sign-off. Spawn up to `parallelism` (default 3) subagents IN PARALLEL — one
+   Task-tool invocation per card, batched in a single message:
+   - implementation cards → the **`worker`** agent
+   - verification cards → the **`reviewer`** agent
+   Each spawn prompt uses the skill's spawn template, injecting that role's charter,
+   boundaries and conventions from the registry, plus exactly one card id.
+   Each subagent works one card in its own worktree, commits its inbox message onto its
+   branch, and terminates.
 
-   Safety rails:
-   - One card per worker per round; respect the parallelism cap.
-   - Never dispatch a card whose `depends-on` is not Done.
-   - If two dispatched cards obviously touch the same area, the Manager serializes them across rounds instead (it notes this in the card's status-log during its pass).
-   - If a composed specialist's agent cannot be invoked (name not found), its file was written into a `.claude/agents/` directory created earlier this session and not yet watched. Tell the user to restart Claude Code once, then re-run `/sprint`; do not fabricate the work.
+   Safety rails: one card per subagent per round; respect the parallelism cap; never dispatch
+   a card whose `depends-on` is not Done; the worker that implemented a card is never the
+   agent that verifies it; if two ready cards' file footprints overlap, the manager serializes
+   them across rounds.
 
 3. Next round — the manager pass drains the new inbox messages.
 
+## Hard stops (autopilot halts on these five, and nothing else)
+
+1. **Init approval** — the initial plan has not been approved yet.
+2. **High/critical security finding** — any `type: escalation` from a `sec-review` role.
+3. **Open human question** — at the end of a round, if any Blocked card carries a
+   `question(HUMAN):` line, stop and present them all together. The card leaves Blocked when
+   the Manager records the human's answer, so an answered question cannot re-trigger this
+   stop.
+4. **Round cap** — `max-rounds-per-sprint` (default 20) reached with work still open.
+5. **Completion** — every card is in Done.
+
+On any hard stop: write `.sdlc/.awaiting-human`, present the summary, and STOP. The next
+manager pass clears the flag when work resumes.
+
+**Everything else is an auto-decision** — role mints, charter extensions and edits,
+allocation, serialization, retiring a role, and creating fix cards. The manager logs each one
+to the Decision Log and the loop continues. In autopilot a sprint/phase gate does not halt:
+it emits a **gate report** and the loop carries on.
+
+Never halt mid-round. A condition discovered mid-round (including a mint-cap breach) becomes
+or stays a Blocked card carrying `question(HUMAN):` and surfaces at the end of that round.
+
+## Gate report (emitted at each sprint/phase gate, and at every hard stop)
+
+```
+GATE REPORT — round <n>, phase <phase>
+Done this gate: <card ids>        Open: <counts by column>
+Merged: <branches>                Blocked: <card ids + why>
+Decisions (auto) since last gate: <count> — <one line each>
+
+Role health
+  R-01 backend      6 cards, 1 rework
+  R-04 sec-review   3 cards, 0 rework
+  R-05 qa-verify    4 cards, 2 rework  ⚠ charter fix applied: <what was changed>
+Any role at rework >= 2 must show the charter/conventions fix that was applied.
+
+Needs you: <card id + question for each open question(HUMAN) card, or "none">
+```
+
+In normal (non-autopilot) mode, the gate report is presented and the loop STOPS for your
+approval, as before.
+
 Report a one-line progress note after each round.
 
-When you pause because the requested number of rounds (`$1`) has run while cards are still open, write an empty `.sdlc/.awaiting-human` file before ending, so the Stop hook treats this as a legitimate pause rather than an unfinished sprint. The next `/sprint` invocation's manager pass will clear it on resume.
+> Note on provenance: the enablement mechanism (`autopilot: on|off` in `project-config.md`,
+> plus `/sprint --auto`) is this implementation's invention, not called out verbatim in the
+> original build spec (`docs/spec.md`) — flagged here so a reader can tell spec from
+> invention.

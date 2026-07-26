@@ -1,10 +1,17 @@
-# Team Roster & Role Boundaries
+# Role Registry
 
-Composed per project by the Manager at init. The first three roles are always present; the rest are specialists the Manager generated from the brief (their agent files live in `.claude/agents/`).
+Roles are minted, reused, and evolved by the Manager at runtime. Only the Manager writes this
+file. IDs (`R-##`) are stable and never reused; retired roles stay for archive traceability.
 
-| Name             | Role                    | Writes code? | Scope / hard boundaries |
-|------------------|-------------------------|--------------|-------------------------|
-| Manager          | Manager / Orchestrator  | No           | Only writer of kanban.md. Decomposes, assigns, merges, runs checkpoints, composes the team. Never implements features. |
-| Security Reviewer| Security Engineer       | No (v1)      | Reviews diffs, dependency/CVE scans; files findings as proposed tasks; high/critical → halt. Never fixes code directly. |
-| QA Engineer      | QA Engineer             | Tests only   | Writes/runs tests, verifies DoD checkboxes, signs off cards. Never modifies non-test source. |
-| <slug>  | <e.g. Backend Developer>| Yes          | <owned areas> — never <out-of-scope areas>. |
+<!-- Roles are appended below by the Manager, newest last. Example shape:
+
+  ## R-01 · backend
+  - charter: Owns server code: API routes, business logic, DB schema/migrations, server tests.
+  - boundaries: Never edits mobile/web UI code, CI config, or deployment manifests.
+  - conventions: |
+      zod for validation; error envelope in src/api/errors.ts; money in integer minor units.
+  - default-tools: standard
+  - status: active
+  - minted: 2026-07-25 by Manager (init)
+  - history: 0 cards completed, 0 rework
+-->

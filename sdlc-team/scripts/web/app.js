@@ -42,7 +42,7 @@ function applyTheme(theme) {
   btn.textContent = t === 'blueprint' ? '⇄ SPRINT WALL MODE' : '⇄ BLUEPRINT MODE';
   btn.setAttribute('aria-pressed', String(t === 'blueprint'));
   renderTitle();
-  if (currentData) { renderHeader(currentData); renderBoard(); }  // flavour text + empty hints differ
+  if (currentData) { renderHeader(currentData); renderNeedsYou(currentData); renderBoard(); }  // flavour text + empty hints differ
 }
 
 function renderTitle() {
@@ -130,7 +130,11 @@ function renderTeam(d) {
     s.appendChild(el('span', 'face', (m.name || m.id || '?').trim().charAt(0).toUpperCase()));
     s.appendChild(el('b', null, m.name || m.id));
     s.append(' ');
-    s.appendChild(el('small', null, m.busy && m.currentTask ? `${m.role} · ${m.currentTask}` : m.role));
+    const detail = [m.role];
+    if (m.busy && m.currentTask) detail.push(m.currentTask);
+    if (m.rework >= 2) detail.push(`⚠ ${m.rework} rework`);
+    s.appendChild(el('small', null, detail.filter(Boolean).join(' · ')));
+    if (m.status === 'retired') s.dataset.retired = 'true';
     host.appendChild(s);
   }
 }
@@ -138,7 +142,8 @@ function renderTeam(d) {
 function cardNode(c, byId) {
   const a = el('article', 'card');
   a.dataset.status = c.status;
-  a.dataset.agent = c.assignee || '';
+  const roleKey = c.role || c.assignee || '';
+  a.dataset.agent = roleKey;                 // CSS colour hook (unchanged attribute name)
   if (c.priority) a.dataset.priority = c.priority;
   if (c.questionFor) a.dataset.questionFor = c.questionFor;
   const stamp = STAMPS[c.status];
@@ -147,14 +152,13 @@ function cardNode(c, byId) {
     a.dataset.stampWall = stamp[1];
     a.dataset.stampBp = stamp[2];
   }
-  const agent = byId[c.assignee];
+  const agent = byId[roleKey];
   if (agent && agent.color) a.style.setProperty('--note', agent.color);
 
   a.appendChild(el('span', 'tid', c.id));
   a.appendChild(el('h3', 'ttl', c.title));
-  a.appendChild(el('div', 'who', c.reviewerName
-    ? `${c.assigneeName || c.assignee} → ${c.reviewerName}`
-    : (c.assigneeName || c.assignee || 'unassigned')));
+  const whoText = c.roleName || c.assigneeName || roleKey || 'unassigned';
+  a.appendChild(el('div', 'who', c.reviewerName ? `${whoText} → ${c.reviewerName}` : whoText));
 
   if (c.dod && c.dod.total > 0) {
     const pct = Math.round((c.dod.done / c.dod.total) * 100);
@@ -194,6 +198,40 @@ function renderBoard() {
     if (!cards.length) col.appendChild(el('p', 'empty', EMPTY_HINT[currentTheme()]));
     for (const c of cards) col.appendChild(cardNode(c, byId));
     host.appendChild(col);
+  }
+}
+
+// Open questions addressed to the human. There is no separate queue file — a
+// question(HUMAN) card sitting in Blocked IS the queue, so this is derived.
+function humanQuestions(d) {
+  return (d.cards || []).filter(c => c.questionFor === 'human' && c.question);
+}
+
+function renderNeedsYou(d) {
+  const host = document.getElementById('needsyou');
+  host.textContent = '';
+  const open = humanQuestions(d);
+  host.hidden = open.length === 0;
+  if (!open.length) return;
+
+  const n = open.length;
+  host.appendChild(el('h4', null,
+    currentTheme() === 'blueprint'
+      ? `RFI SCHEDULE — ${n} OPEN`
+      : `needs you — ${n} question${n === 1 ? '' : 's'}`));
+
+  for (const c of open) {
+    const row = el('div', 'qrow');
+    row.tabIndex = 0;
+    row.appendChild(el('span', 'qid', c.id));
+    row.appendChild(el('span', 'qtext', c.question));
+    if (c.roleName || c.role) row.appendChild(el('span', 'qrole', c.roleName || c.role));
+    const open1 = () => openOverlay(c);
+    row.addEventListener('click', open1);
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open1(); }
+    });
+    host.appendChild(row);
   }
 }
 
@@ -238,13 +276,17 @@ function openOverlay(c) {
   body.textContent = '';
   body.appendChild(el('h3', null, `${c.id} — ${c.title}`));
   body.appendChild(el('p', null,
-    `status: ${c.status} · assignee: ${c.assigneeName || c.assignee || 'unassigned'}` +
+    `status: ${c.status} · role: ${c.roleName || c.role || 'unassigned'}` +
     `${c.reviewerName ? ' · reviewer: ' + c.reviewerName : ''} · priority: ${c.priority}`));
   if (c.branch) body.appendChild(el('p', null, `branch: ${c.branch}`));
   if (c.dependsOn && c.dependsOn.length) {
     body.appendChild(el('p', null, `depends on: ${c.dependsOn.join(', ')}`));
   }
   if (c.question) body.appendChild(el('p', null, `question (${c.questionFor}): ${c.question}`));
+  if (c.verifyRoles && c.verifyRoles.length) {
+    body.appendChild(el('p', null,
+      'must be verified by: ' + c.verifyRoles.map(v => `${v.id} ${v.name}`.trim()).join(', ')));
+  }
   if (c.dod && c.dod.total) {
     body.appendChild(el('p', null, `definition of done: ${c.dod.done} of ${c.dod.total} complete`));
   }
@@ -287,6 +329,7 @@ async function poll() {
     renderTitle();
     renderHeader(d);
     renderRail(d);
+    renderNeedsYou(d);
     renderTeam(d);
     renderBoard();
     renderFeed(d);

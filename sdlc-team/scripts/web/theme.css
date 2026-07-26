@@ -7,12 +7,23 @@
 body{
   min-height:100vh;transition:background .3s;
   display:grid;grid-template-columns:214px 1fr;
-  grid-template-areas:"rail hdr" "rail team" "rail board" "rail feed" "rail tblock";
-  grid-template-rows:auto auto 1fr auto auto;
+  grid-template-areas:"rail hdr" "rail needs" "rail team" "rail board" "rail feed" "rail tblock";
+  grid-template-rows:auto auto auto 1fr auto auto;
 }
 .hdr{grid-area:hdr;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;padding:24px 32px 6px}
 .rail{grid-area:rail;padding:24px 14px;overflow-y:auto}
 .team{grid-area:team;display:flex;gap:12px;padding:10px 32px 4px;flex-wrap:wrap}
+
+/* ADDED (no demo reference): open question(HUMAN) cards, listed. There is no queue
+   file — this is derived from the board, so it empties itself when you answer. */
+.needsyou{grid-area:needs;margin:10px 32px 0;padding:10px 14px}
+.needsyou[hidden]{display:none}
+.needsyou h4{font-size:11px;letter-spacing:.16em;margin-bottom:8px}
+.qrow{display:flex;align-items:baseline;gap:10px;padding:5px 0;cursor:pointer}
+.qrow + .qrow{border-top:1px dashed rgba(0,0,0,.14)}
+.qid{flex:0 0 auto;font-size:11px;font-weight:800;letter-spacing:.08em}
+.qtext{flex:1 1 auto;font-size:12.5px;line-height:1.35}
+.qrole{flex:0 0 auto;font-size:10px;opacity:.8}
 .board{grid-area:board;display:grid;grid-template-columns:repeat(5,1fr);gap:16px;padding:18px 28px 30px;align-items:start}
 .feed{grid-area:feed;margin:0 32px 30px;padding:12px 18px}
 .titleblock{grid-area:tblock;display:none}
@@ -88,6 +99,7 @@ body[data-theme="wall"] #railSelect{background:#fff;color:#2E2A26;border:1px sol
 body[data-theme="wall"] .member{background:#fff;border-radius:20px;box-shadow:1px 2px 5px rgba(0,0,0,.12)}
 body[data-theme="wall"] .face{font-family:'Caveat',cursive}
 body[data-theme="wall"] .member[data-busy]::after{color:#3E8E5A}
+body[data-theme="wall"] .member[data-retired]{opacity:.55;filter:grayscale(.5)}
 
 /* ADAPTATION 1: palette arrives as --note (set inline per agent), replacing the
    demo's six hardcoded [data-agent="name"] rules — the roster is dynamic. */
@@ -126,6 +138,13 @@ body[data-theme="wall"][data-state="error"] .team,
 body[data-theme="wall"][data-state="error"] .feed,
 body[data-theme="wall"][data-state="error"] .titleblock{display:none}
 body[data-theme="wall"][data-state="error"] .gate{border-left-color:#B33A3A;color:#B33A3A;font-weight:700}
+
+body[data-theme="wall"] .needsyou{background:#fff;border-left:6px solid #B33A3A;border-radius:4px;box-shadow:2px 3px 8px rgba(0,0,0,.12);transform:rotate(-.4deg)}
+body[data-theme="wall"] .needsyou h4{font-family:'Caveat',cursive;font-size:19px;letter-spacing:0;color:#B33A3A}
+body[data-theme="wall"] .qid{color:#B33A3A}
+body[data-theme="wall"] .qtext{color:#2E2A26}
+body[data-theme="wall"] .qrole{color:#635C52}
+body[data-theme="wall"] .qrow:hover .qtext{text-decoration:underline}
 
 /* ============================================================
    THEME: BLUEPRINT
@@ -167,6 +186,7 @@ body[data-theme="blueprint"] .face{display:none}
 body[data-theme="blueprint"] .member b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase}
 body[data-theme="blueprint"] .member small{letter-spacing:.12em;text-transform:uppercase;color:#9DB4E0;opacity:1}
 body[data-theme="blueprint"] .member[data-busy]::after{content:"▸ RUNNING";color:var(--ok)}
+body[data-theme="blueprint"] .member[data-retired]{opacity:.6}
 
 body[data-theme="blueprint"] .col{border-top:1px solid var(--lineW);border-right:0;padding:10px 0 0}
 body[data-theme="blueprint"] .col h2{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.2em;text-transform:uppercase;background:none;box-shadow:none;transform:none;width:auto;margin:0 0 14px;padding:0;text-align:left}
@@ -212,6 +232,14 @@ body[data-theme="blueprint"][data-state="error"] .feed,
 body[data-theme="blueprint"][data-state="error"] .titleblock{display:none}
 body[data-theme="blueprint"][data-state="error"] .gate{border-style:solid;border-color:var(--alarm);color:var(--alarm)}
 
+body[data-theme="blueprint"] .needsyou{border:1px solid var(--alarm);background:rgba(255,156,143,.07);border-radius:0}
+body[data-theme="blueprint"] .needsyou h4{font-family:'Oswald',sans-serif;letter-spacing:.22em;color:var(--alarm)}
+body[data-theme="blueprint"] .qrow + .qrow{border-top:1px dashed var(--lineF)}
+body[data-theme="blueprint"] .qid{font-family:'Oswald',sans-serif;color:var(--alarm);letter-spacing:.1em}
+body[data-theme="blueprint"] .qtext{color:#E8F0FF}
+body[data-theme="blueprint"] .qrole{color:#9DB4E0;text-transform:uppercase;letter-spacing:.1em}
+body[data-theme="blueprint"] .qrow:hover{background:rgba(255,156,143,.1)}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
@@ -228,6 +256,7 @@ body[data-theme="blueprint"][data-state="error"] .gate{border-style:solid;border
   .team{padding:10px 16px 4px}
   .board{padding:14px 14px 24px}
   .feed{margin:0 16px 24px}
+  .needsyou{margin:10px 16px 0}
   body[data-theme="wall"] .col{border-right:0}
   /* Blueprint's .team sets its own margin (not padding) to draw the manifest
      border flush; match the 16px the other panels drop to here, keeping the

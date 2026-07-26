@@ -1,5 +1,5 @@
 ---
-from: <AgentName>
+from: <R-## role-name>       # the acting role, e.g. R-01 backend; the Manager writes `from: Manager`
 task: <T-### or GENERAL>
 type: status-update
 timestamp: <ISO timestamp>

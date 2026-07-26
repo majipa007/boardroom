@@ -20,11 +20,22 @@ Load the `sdlc-board` skill for all schemas and templates.
    - `.sdlc/team.md` — copied verbatim.
    - `.sdlc/kanban.md` — header filled (project name, methodology, `round: 0`), all columns empty.
    - Create empty `.sdlc/inbox/` and `.sdlc/archive/` directories, each with a `.gitkeep`.
-   - Ensure the project's `.claude/agents/` directory exists (create it if absent). The Manager writes the composed specialist agent files here. If you had to create it now, the session's file watcher will not see it until a restart — you will surface this in the approval step below.
    - Register the project with the dashboard: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/lib/discover.js" --register "$(pwd)"` (appends this project's absolute path to `~/.sdlc-team/projects.json`; idempotent — safe to run again). If Node.js is unavailable, skip this; the dashboard's `--root` scan can still find the project.
 
-4. **Compose the team, then decompose the brief.** Invoke the `manager` agent to:
-   - Compose a project-specific team from the brief (Manager, Security, QA always; plus the implementation specialists the project needs), following the "Composing the team" rules in its prompt: write each specialist's agent file into `.claude/agents/<slug>.md` from the skill's `templates/worker-agent.md`, and record the full roster in `.sdlc/team.md`.
-   - Decompose the brief into an initial backlog under `## Backlog`: at least 3 well-formed cards with a full Definition of Done and a `T-###` id starting at `T-001`, each assigned to a composed role. The Manager is the only agent that writes `kanban.md`.
+4. **Seed the role registry, then decompose the brief.** Invoke the `manager` agent to:
+   - Seed `.sdlc/team.md` as a role registry: mint only the roles the brief clearly needs
+     right now (start small — more are minted on demand as cards appear), each with an
+     `R-##` id, name, charter, boundaries, a `conventions` seed, `status: active`, `minted`,
+     and `history: 0 cards completed, 0 rework`. Always include a `sec-review` role and a
+     `qa-verify` role, since classification attaches them to most cards.
+   - Decompose the brief into the initial backlog under `## Backlog`: at least 3 well-formed
+     cards, each with a full Definition of Done, a `T-###` id starting at `T-001`, a
+     `role: R-## <name>`, and `verify-roles` set from the classification table in the skill.
+   The manager is the only agent that writes `kanban.md` and `team.md`.
 
-5. **Checkpoint 1 — init approval.** Write an empty file `.sdlc/.awaiting-human`. Present: the chosen methodology, the composed team (from `team.md`), and the backlog summary. **If `.claude/agents/` was created during this run, tell the user to restart Claude Code once now so the new specialist agents load, then run `/sprint`.** STOP and ask the human to approve before any code is written. On approval, delete `.sdlc/.awaiting-human`.
+5. **Checkpoint 1 — init approval.** Write an empty file `.sdlc/.awaiting-human`. Present the
+   chosen methodology, the seeded role registry (ids, names, one-line charters), and the
+   backlog summary. Mention whether `autopilot` is `on` or `off` in `project-config.md` and
+   that `/sprint --auto` can force it for one run. STOP and ask the human to approve before
+   any code is written. On approval, delete `.sdlc/.awaiting-human`; the project is ready for
+   `/sprint`.

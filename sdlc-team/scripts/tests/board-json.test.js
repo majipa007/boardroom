@@ -221,3 +221,125 @@ test('buildPayload revision changes when only another project changed', () => {
   assert.strictEqual(after.project.name, 'alpha', 'still the selected project');
   assert.notStrictEqual(after.revision, first, 'rail change must change the revision');
 });
+
+const REG = `# Role Registry
+
+## R-01 · backend
+- charter: Owns server code: API routes and business logic.
+- boundaries: Never edits UI.
+- status: active
+- minted: 2026-07-25 by Priya (init)
+- history: 4 cards completed, 2 rework
+
+## R-04 · sec-review
+- charter: Reviews diffs for security.
+- boundaries: Read-only on source.
+- status: active
+- minted: 2026-07-25 by Priya (auto)
+- history: 1 cards completed, 0 rework
+`;
+
+const ROLE_BOARD = `# Kanban — roled
+> methodology: agile | phase: P1
+> last-updated: x | round: 3
+
+## Blocked
+
+## Backlog
+
+## In Progress
+
+### T-030 | Auth endpoints
+- role: R-01 backend
+- verify-roles: [R-04 sec-review, R-05 qa-verify]
+- priority: high
+- branch: sdlc/T-030-auth
+- definition-of-done:
+  - [x] routes
+  - [ ] tests
+
+## Review
+
+## Done
+`;
+
+const CAPS_CONFIG = `# Project Config
+- project: Roled
+- methodology: agile
+- parallelism: 3
+- max-role-mints-per-sprint: 4
+- max-active-roles: 10
+- autopilot: on
+`;
+
+function makeRoleProject(base, name) {
+  const dir = path.join(base, name);
+  const sdlc = path.join(dir, '.sdlc');
+  fs.mkdirSync(path.join(sdlc, 'archive'), { recursive: true });
+  fs.mkdirSync(path.join(sdlc, 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(sdlc, 'kanban.md'), ROLE_BOARD);
+  fs.writeFileSync(path.join(sdlc, 'team.md'), REG);
+  fs.writeFileSync(path.join(sdlc, 'project-config.md'), CAPS_CONFIG);
+  return dir;
+}
+
+test('cards expose role, roleName, verifyRoles, and keep assignee as an alias', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bjr-'));
+  const b = buildBoardJson(makeRoleProject(base, 'roled'));
+  const c = b.cards.find(x => x.id === 'T-030');
+
+  assert.strictEqual(c.role, 'R-01');
+  assert.strictEqual(c.roleName, 'backend');
+  assert.strictEqual(c.assignee, c.role, 'assignee is a one-version alias of role');
+  assert.deepStrictEqual(c.verifyRoles, [
+    { id: 'R-04', name: 'sec-review' },
+    { id: 'R-05', name: 'qa-verify' },
+  ]);
+});
+
+test('team[] is built from the registry with status and history counts', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bjr-'));
+  const b = buildBoardJson(makeRoleProject(base, 'roled'));
+
+  const byId = Object.fromEntries(b.team.map(t => [t.id, t]));
+  assert.strictEqual(b.team.length, 2);
+  assert.strictEqual(byId['R-01'].name, 'backend');
+  assert.strictEqual(byId['R-01'].status, 'active');
+  assert.strictEqual(byId['R-01'].cardsCompleted, 4);
+  assert.strictEqual(byId['R-01'].rework, 2);
+  assert.ok(NOTE_PALETTE.includes(byId['R-01'].color));
+  // the in-progress card is assigned to R-01, so that role is busy
+  assert.strictEqual(byId['R-01'].busy, true);
+  assert.strictEqual(byId['R-01'].currentTask, 'T-030');
+  assert.strictEqual(byId['R-04'].busy, false);
+});
+
+test('project exposes the role caps and the autopilot flag', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bjr-'));
+  const b = buildBoardJson(makeRoleProject(base, 'roled'));
+  assert.strictEqual(b.project.maxRoleMints, 4);
+  assert.strictEqual(b.project.maxActiveRoles, 10);
+  assert.strictEqual(b.project.autopilot, 'on');
+});
+
+test('caps and autopilot fall back when the config omits them', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bjr-'));
+  const dir = makeRoleProject(base, 'bare');
+  fs.writeFileSync(path.join(dir, '.sdlc', 'project-config.md'),
+    '# Project Config\n- project: Bare\n- methodology: agile\n');
+  const b = buildBoardJson(dir);
+  assert.strictEqual(b.project.maxRoleMints, 4);
+  assert.strictEqual(b.project.maxActiveRoles, 10);
+  assert.strictEqual(b.project.autopilot, 'off');
+});
+
+test('a legacy roster project still produces a team and a usable role key', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bjr-'));
+  const dir = makeProject(base, 'legacy');       // existing helper: table roster + assignee cards
+  const b = buildBoardJson(dir);
+  assert.ok(b.team.length > 0, 'legacy roster still yields a team');
+  for (const c of b.cards) {
+    assert.strictEqual(typeof c.role, 'string');
+    assert.strictEqual(c.assignee, c.role);
+  }
+});
