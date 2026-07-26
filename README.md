@@ -121,7 +121,7 @@ The rules that make it hold together:
 - **Messages are the audit log.** The manager processes the inbox oldest-first and moves each file *unchanged* into `.sdlc/archive/`. That archive plus `git log` is a complete, replayable project history.
 - **Shared branch, explicit ownership, no worktrees.** An increment is a dynamically-sized bundle of ready cards — no size cap — built together on one branch (`sdlc/inc-##-<slug>`). Every agent working that increment shares the same checkout; the manager tells each one exactly which files it owns, and no agent may run `git checkout/switch/reset/stash` or `git add -A` — HEAD is shared, and moving it would corrupt every other agent's work in that round.
 - **One verification gate per increment.** Once every card in the bundle is done, all of that increment's verify-roles review the combined diff in a single parallel round — tests, review and security together, batched instead of per-card. A high/critical security finding still halts everything before the merge; a failing test run still blocks the merge unconditionally.
-- **Done is mechanical.** Every card carries a Definition of Done — capped at ~3 checkboxes plus a one-line `ships-when:` — and a box may only be checked by the role that owns it. A card reaches Done only when every box is checked.
+- **Shipped is mechanical.** Every card carries a Definition of Done — capped at ~3 checkboxes plus a one-line `ships-when:` — and a box may only be checked by the role that owns it. A card reaches Shipped only once every box is checked and its increment is verified and merged.
 - **The session can't quietly abandon work.** A Stop hook blocks the session from ending while cards are still open, unless the board is legitimately waiting on you.
 - **Roles, not people.** The manager keeps a role registry and spawns a generic `worker` or
   `reviewer` with the role's charter injected — so a new specialist costs a registry entry,
@@ -185,7 +185,7 @@ card needs "train a recommender"
 
 Reuse beats minting, charter edits beat replacements, and retired roles are kept so history
 still resolves. Every card carries mandatory `verify-roles` chosen by risk class, and cannot
-reach Done until each has signed off — with the implementer never allowed to be the verifier.
+reach Shipped until each has signed off — with the implementer never allowed to be the verifier.
 
 ---
 
@@ -254,7 +254,7 @@ Two themes over the same board, toggled from the header and remembered across re
 | **Sprint Wall** (default) | Sticky notes pinned to a plaster wall — painter's-tape column headers, handwritten titles, a 🔥 on high-priority cards |
 | **Blueprint** | Drafting paper — grid, 1px linework, square spec-sheet cards, rotated `HOLD`/`W.I.P.`/`INSPECT`/`MERGED` stamps, `RFI → HUMAN` callouts, and a drawing title block |
 
-It is strictly **read-only**. It never writes to your projects.
+Every Definition-of-Done checkbox is clickable: ticking or un-ticking one writes a `dod-check` inbox message (`from: Human`) instead of touching the board directly, and the box shows `unchecked → pending → checked` (or the reverse) as the Manager applies it on its next pass. That is the dashboard's **only** write path — it writes exclusively into `.sdlc/inbox/` and never edits `kanban.md`, `team.md`, or any source file.
 
 Projects register themselves at `/sdlc-init` (tracked in `~/.sdlc-team/projects.json`). Pass `--root <dir>` to also scan a workspace for boards created elsewhere.
 

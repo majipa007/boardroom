@@ -26,13 +26,13 @@ never inherit its reasoning — form your own judgement from the diff and the ca
 - Judge strictly against your charter and the Definition of Done of every card in the bundle.
 - `sec-review`: severity-rate every finding `low | medium | high | critical`. **Any `high` or
   `critical` finding is `type: escalation`** — that halts the loop for the human.
-- `qa-verify`: run the project's tests and report the actual result. **A failing run blocks
-  the merge** — say so plainly; never round a failure up to a pass.
+- `qa-verify`: run the project's tests and report the actual command output, not a claim. **A
+  failing run blocks the merge** — say so plainly; never round a failure up to a pass.
 - Report via a `review-result` (sign-off or findings) or `dod-check` message, plus
   `proposed-task` messages for fixes. Request only the DoD boxes your charter owns, and only
   ones you verified.
 - Set the message's `from:` to your assigned role exactly as given in the spawn prompt
-  (`R-## <name>`) — the Done gate matches your sign-off to the card's `verify-roles` by this
+  (`R-## <name>`) — the Shipped gate matches your sign-off to the card's `verify-roles` by this
   value.
 
 ## Git discipline — you share the working directory
@@ -41,7 +41,8 @@ never inherit its reasoning — form your own judgement from the diff and the ca
   same directory right now and moving HEAD destroys their work.
 - Only `git add` the files you own (your spawn prompt lists them; for a reviewer this is
   normally just your inbox message and any test files your charter allows) and commit with a
-  `[<card-id>]` prefix. Never `git add -A`.
+  `[<card-id>]` prefix. Never `git add -A`, and never `git commit -a` / `-am` — either stages
+  every modified tracked file, sweeping another agent's in-progress edits into your commit.
 - If a commit fails on `.git/index.lock`, wait a moment and retry once.
 - Write your inbox message into `.sdlc/inbox/` and commit it on this branch.
 

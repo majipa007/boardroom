@@ -6,14 +6,14 @@ const path = require('path');
 // else: never kanban.md, never team.md, never a source file. The Manager applies
 // the request on its next pass, so the board keeps a single writer.
 function writeDodCheck({ projectDir, cardId, index, checked, boxText, now }) {
-  if (!projectDir || !cardId || !Number.isInteger(index)) {
-    throw new Error('projectDir, cardId and an integer index are required');
+  if (!projectDir || !cardId || !Number.isInteger(index) || index < 0) {
+    throw new Error('projectDir, cardId and a non-negative integer index are required');
   }
+  // A card id is T-###-shaped; reject anything else before it reaches a filename
+  // (a traversing id like "../../../OUTSIDE/pwned" must never get this far).
+  if (!/^[A-Za-z0-9._-]+$/.test(String(cardId))) throw new Error('invalid cardId');
+
   const inbox = path.join(projectDir, '.sdlc', 'inbox');
-  const resolved = path.resolve(inbox);
-  if (!resolved.startsWith(path.resolve(projectDir, '.sdlc'))) {
-    throw new Error('refusing to write outside .sdlc/inbox');
-  }
   fs.mkdirSync(inbox, { recursive: true });
 
   const stamp = (now || new Date().toISOString()).replace(/\.\d+Z$/, 'Z');
@@ -23,6 +23,12 @@ function writeDodCheck({ projectDir, cardId, index, checked, boxText, now }) {
   // and silently drop a request. Re-toggling the SAME box in one second still lands
   // on one filename, which is correct — last state wins.
   const file = path.join(inbox, `${safeStamp}_HUMAN_${cardId}-dod${index}.md`);
+  // Guard the actual write target, not just the (always-inside, by construction)
+  // inbox directory above — this is the real choke point.
+  const inboxRoot = path.resolve(inbox);
+  if (!path.resolve(file).startsWith(inboxRoot + path.sep)) {
+    throw new Error('refusing to write outside .sdlc/inbox');
+  }
   const verb = checked ? 'check' : 'uncheck';
   const body = `---
 from: Human

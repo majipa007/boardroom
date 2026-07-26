@@ -46,7 +46,7 @@ Columns, in fixed order. Cards live under a column heading.
 - phase: Sprint 2
 - priority: high
 - depends-on: [T-011]
-- branch: sdlc/T-014-jwt-refresh          # set when work starts
+- branch: sdlc/inc-03-auth-refresh       # the cycle's increment branch; set when work starts
 - what: |
     Add POST /auth/refresh. Rotate refresh tokens, invalidate old token,
     return new access+refresh pair. Follow existing error envelope in src/api/errors.ts.
@@ -86,7 +86,9 @@ agents can run at once without separate checkouts.
 - **Never run `git checkout`, `git switch`, `git reset`, `git stash`,** or anything else that
   moves HEAD or rewrites the index wholesale. Doing so destroys every other agent's work in
   flight.
-- Only ever `git add <the files you own>` and `git commit`. Never `git add -A`.
+- Only ever `git add <the files you own>` and `git commit`. Never `git add -A`, and never
+  `git commit -a` / `-am` — either stages every modified tracked file, sweeping another
+  agent's in-progress edits into your commit.
 - Your spawn prompt names the **files you own**. Editing a file outside that scope is a defect
   even if your charter would otherwise allow it — another agent may hold it this cycle.
 - If a commit fails on `.git/index.lock`, wait a moment and retry once.
@@ -107,7 +109,7 @@ review role does not exist yet, the Manager mints it.
 bare name — the `R-##` id is whatever id that role already has in the registry, or the next
 free id assigned when the Manager mints it for this classification.
 
-**A card cannot move to Done until every role in its `verify-roles` has a sign-off message in
+**A card cannot move to Shipped until every role in its `verify-roles` has a sign-off message in
 `.sdlc/archive/`.** Sign-off means a `review-result` (or `dod-check` for `qa-verify`) message
 from that role reporting success.
 
@@ -133,10 +135,10 @@ type: status-update        # status-update | dod-check | question | proposed-tas
 timestamp: 2026-07-24T11:47:00Z
 ---
 ## Summary
-Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
+Implemented refresh endpoint on the increment branch sdlc/inc-03-auth-refresh. 14 files changed.
 
 ## Requested board changes
-- move T-014 → Review
+- move T-014 → In flight
 - check DoD box 1 ("Endpoint implemented...")
 
 ## Notes for others
@@ -149,7 +151,7 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 
 **Inbox rules:**
 - Every message's `from:` MUST be the acting role, written as `R-## <name>` (or `Manager`) —
-  never a person's name. The Done gate matches a card's `verify-roles` against sign-offs by
+  never a person's name. The Shipped gate matches a card's `verify-roles` against sign-offs by
   this value, so a message with the wrong `from:` is invisible to that check.
 - Workers **never** edit `kanban.md`. All board changes are *requests* in inbox messages.
 - `proposed-task` messages contain a full draft card; the Manager decides whether it becomes a real card.
@@ -215,7 +217,8 @@ You are acting as role <R-id name>.
 CHARTER: <charter>
 BOUNDARIES: <boundaries>
 CONVENTIONS: <conventions>
-Your card: <card-id>. Round: <n>. Report via inbox only.
+Your bundle: <card ids in dependency order>. Branch: <increment branch>.
+Files you own: <list>. Round: <n>. Report via inbox only.
 ```
 
 `worker` and `reviewer` are separate definitions on purpose: implementation and verification

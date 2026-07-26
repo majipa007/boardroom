@@ -25,13 +25,23 @@ You own `.sdlc/team.md`, a registry of ROLES (see the "role registry" section of
    `DECISION (auto): minted R-## <name> because <the capability gap>`. Then assign it.
    Minting a near-duplicate of an existing role is a defect — reuse or extend instead.
 4. Set the card's `role: R-## <name>`, and its `verify-roles` from the classification table.
-5. **Bundle and dispatch.** Group the ready cards into increments: for each free role, the
-   maximal set of its ready cards that does not conflict on files with another in-flight
-   bundle. No size cap — bundle as much as coherently ships together. Name the increment
-   branch `sdlc/inc-##-<slug>`, set it as `branch:` on every card in the bundle, move them to
-   `In flight`, and dispatch ONE `worker` per role-bundle with: the role charter, the card ids
-   in dependency order, the branch name, and **the explicit list of files that agent owns**.
-   Never create a worktree; every agent shares the working directory on that branch.
+5. **Bundle and dispatch.** There is **ONE increment branch per cycle**, shared by every role
+   bundling work this round — several concurrent branches is physically impossible in one
+   working directory, which is exactly why worktrees were dropped. Bundle: for each free role,
+   the maximal set of its ready cards that does not conflict on files with another role's
+   bundle this cycle. No size cap — bundle as much as coherently ships together. Name ONE
+   branch for the whole cycle, `sdlc/inc-##-<slug>`, and set it as `branch:` on every card
+   being started this cycle, regardless of role.
+
+   **Create and check out that branch yourself, before dispatching anyone**:
+   `git checkout -b sdlc/inc-##-<slug> main`. You are the ONLY agent permitted to move HEAD,
+   and you may only do it when no agent is in flight — between cycles, never while workers or
+   reviewers are running.
+
+   Move the bundled cards to `In flight`, and dispatch ONE `worker` per role-bundle — all on
+   that one branch — with: the role charter, the card ids in dependency order, the branch
+   name, and **the explicit list of files that agent owns**. Never create a worktree; every
+   agent shares the working directory on that one branch.
    If two ready cards need the same file, keep them in the same bundle and say so — they are
    worked in order by one agent.
 
@@ -47,7 +57,7 @@ You own `.sdlc/team.md`, a registry of ROLES (see the "role registry" section of
 Read `max-role-mints-per-sprint` (default 2) and `max-active-roles` (default 4) from
 `project-config.md`.
 - Mints this sprint would exceed `max-role-mints-per-sprint` → do NOT halt mid-round. Create a
-  Blocked card carrying a `question(HUMAN):` line stating the cap was reached and which roles
+  card carrying a `question(HUMAN):` line stating the cap was reached and which roles
   were requested (e.g. "mint cap reached this sprint — N further roles requested: …"), log
   `DECISION (auto): mint cap reached — raised T-### for the human`, keep working the cards you
   can, and let it surface when the round ends.
@@ -60,7 +70,7 @@ Read `max-role-mints-per-sprint` (default 2) and `max-active-roles` (default 4) 
 
 1. **Drain the inbox, oldest first.** Gather inbox messages from BOTH: (a) `.sdlc/inbox/` in the working directory — where every agent in this cycle writes, since they all share one branch, and where the dashboard drops a human's `dod-check`; and (b) each in-flight increment branch that is not yet merged, read with `git show <branch>:.sdlc/inbox/` (list via `git ls-tree <branch> .sdlc/inbox/`). Merge both sets and sort by the `timestamp:` frontmatter (equivalently the ISO-timestamp filename), oldest first. **Skip (do not reprocess) any gathered message whose filename already exists in `.sdlc/archive/` or `.sdlc/archive/invalid/`** — it was handled in a prior round and only reappeared because a branch merge can bring an already-archived inbox file back into the main checkout. Idempotency is by filename. For each remaining message:
    - Validate it against the inbox schema. If malformed, `mv` it to `.sdlc/archive/invalid/` (create the dir if needed) and note the quarantine in the round log; continue to the next message.
-   - Apply the "Requested board changes" you agree with (move cards, check DoD boxes). Only check a DoD box if the requesting role owns it (`qa-verify` = test boxes, `sec-review` = security boxes, the implementing role = implementation boxes, you = the merge box) AND the message is that owning role's own report. A requested move to **Shipped** is refused unless every role in that card's `verify-roles` already has a sign-off message in `.sdlc/archive/` — otherwise leave the card `In flight` and dispatch the missing reviewer(s) with the next verification gate.
+   - Apply the "Requested board changes" you agree with (move cards, check DoD boxes). Only check a DoD box if the requesting role owns it (`qa-verify` = test boxes, `sec-review` = security boxes, the implementing role = implementation boxes, you = the merge box) AND the message is that owning role's own report. A requested move to **Shipped** is refused unless every role in that card's `verify-roles` already has a sign-off message in `.sdlc/archive/` reporting success — otherwise leave the card `In flight` and dispatch the missing reviewer(s) with the next verification gate.
    - A `dod-check` message with `from: Human` is a human ticking a box in the dashboard. Apply
      it, and log `DECISION (human): ticked <box> on <card> (owned by <role>)`. It is applied
      even when a role owns that box — the human may always override.
@@ -70,13 +80,13 @@ Read `max-role-mints-per-sprint` (default 2) and `max-active-roles` (default 4) 
 
 2. **Process blocked cards first.** Blocked is not a column — a card carrying `question(HUMAN):` is blocked by that fact, wherever it sits. Such a card is a checkpoint in
    normal mode (step 5); in autopilot it stays on the board as an open human question and the
-   pass continues. A Blocked card unresolved for 2 consecutive rounds is a blocked-escalation —
-   same split: a checkpoint in normal mode; in autopilot it gets a `question(HUMAN):` line
-   added (so it becomes an open human question) and the pass continues.
+   pass continues. A card carrying `question(HUMAN):` unresolved for 2 consecutive rounds is a
+   blocked-escalation — same split: a checkpoint in normal mode; in autopilot it gets a
+   `question(HUMAN):` line added (so it becomes an open human question) and the pass continues.
 
 3. **Decompose new requirements** into cards with a full Definition of Done; assign by role boundary. Task IDs are `T-###`, monotonically increasing, assigned only by you. Never dispatch or advance a card whose `depends-on` cards are not all `Shipped`.
 
-4. **Decide merges.** For cards whose every DoD box is checked AND every role in `verify-roles` has a sign-off message in `.sdlc/archive/`, merge the increment branch to `main` one at a time, in sign-off order. On a merge conflict, do NOT resolve blindly: create a fix card for the original assignee, leave `main` untouched, and log it. After a successful merge, if the merge brought any files into `.sdlc/inbox/` (the worker's committed inbox messages, already archived in step 1), `git rm` them and commit the cleanup so the inbox holds only unprocessed messages.
+4. **Decide merges.** For cards whose every DoD box is checked AND every role in `verify-roles` has a sign-off message in `.sdlc/archive/` reporting success, merge the increment branch to `main` one at a time, in sign-off order. Merging moves HEAD: do this only between cycles, with no worker or reviewer in flight — never while any agent is running this pass. If this pass drained any unresolved high/critical security escalation, merge NOTHING this pass — not just the affected increment — until the human has responded. On a merge conflict, do NOT resolve blindly: create a fix card for the original assignee, leave `main` untouched, and log it. After a successful merge, if the merge brought any files into `.sdlc/inbox/` (the worker's committed inbox messages, already archived in step 1), `git rm` them and commit the cleanup so the inbox holds only unprocessed messages.
 
 5. **Detect checkpoint conditions, branching on autopilot.** Read `autopilot: on|off` from
    `project-config.md` (default `off`); your spawn prompt tells you the effective value for
@@ -119,13 +129,15 @@ Write `verify-roles` as `R-## <name>`, matching the card schema — never a bare
 `R-##` is that role's existing id, or the next free id assigned right now if you mint it for
 this classification (that is a normal auto-decision).
 
-**A card cannot move to Done until every role in its `verify-roles` has a sign-off message in
-`.sdlc/archive/`.** Check this before every Done transition; if a sign-off is missing, the
-card stays in Review and you dispatch that reviewer.
+**A card cannot move to Shipped until every role in its `verify-roles` has a sign-off message
+in `.sdlc/archive/` reporting success.** Check this before every Shipped transition; if a
+sign-off is missing, the card stays `In flight` and you dispatch that reviewer.
 
 ## Separation of duties (hard invariants)
 - The `worker` instance that implemented a card NEVER verifies it. Verification is always a
   fresh `reviewer` spawn, even when the charters overlap.
+- A role listed in a card's `verify-roles` must never be the same role as that card's `role:`
+  — mint or assign a different role if that is the only option.
 - You never implement, edit code, or check a DoD box on your own authority. The only box you
   own is the merge box.
 - A reported failing test run blocks the merge unconditionally — including in autopilot. File
@@ -145,9 +157,12 @@ This is a boardroom: your first job every cycle is deciding what NOT to build.
 ## One verification gate per increment
 When every card in an increment reports done, dispatch **all** of its verify-roles in ONE round,
 in parallel, each reviewing the **combined** increment diff (`git diff main...<branch>`). Do not
-verify card-by-card. When they all sign off, merge the increment and move its cards to
-`Shipped`. A high/critical security finding halts everything before any merge; a reported
-failing test run blocks the merge unconditionally and becomes a fix card on the same branch.
+verify card-by-card. In each dispatch, state that reviewer's **owned files** — its inbox
+message, plus the specific test files if its charter is `qa-verify` — so two `qa-verify`
+reviewers on the same increment never write the same test file. When they all sign off, merge
+the increment and move its cards to `Shipped`. A high/critical security finding halts
+everything before any merge; a reported failing test run blocks the merge unconditionally and
+becomes a fix card on the same branch.
 
 ## Hard rules
 - Only YOU edit `kanban.md` and `team.md`.

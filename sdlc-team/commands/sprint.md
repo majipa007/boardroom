@@ -12,8 +12,8 @@ the round-cap hard stop below is the separate, config-driven `max-rounds-per-spr
 **Normal mode** stops at every checkpoint and asks you. **Autopilot** keeps going, logging
 its decisions, and halts only on a hard stop.
 
-Repeat until a hard stop fires, the board is all Done, the round cap is reached, or the
-requested number of rounds has run:
+Repeat until a hard stop fires, every card is `Shipped` or `Killed`, the round cap is reached,
+or the requested number of rounds has run:
 
 **ROUND n — one RAD cycle: construct → verify → cutover:**
 
@@ -27,21 +27,24 @@ requested number of rounds has run:
    roles, per its registry rules), moves anything speculative to `Killed`, and records every
    auto-decision in the Decision Log.
 
-2. **Construct (parallel).** From `.sdlc/team.md` and the board, collect the increments the
-   manager just bundled — each a role's maximal conflict-free set of ready cards on one shared
-   branch (`sdlc/inc-##-<slug>`), moved to `In flight`. Spawn one **`worker`** per role-bundle
-   IN PARALLEL — one Task-tool invocation per bundle, batched in a single message — injecting
-   that role's charter, boundaries and conventions, the bundle's card ids in dependency order,
-   the branch name, and the explicit list of files that agent owns. **No worktrees**: every
-   worker on an increment shares that one checkout, kept apart from other agents only by
-   disjoint file ownership.
+2. **Construct (parallel).** From `.sdlc/team.md` and the board, collect this cycle's ONE
+   increment — the single branch (`sdlc/inc-##-<slug>`) the manager just created and checked
+   out, carrying every role-bundle it just formed (each a role's maximal conflict-free set of
+   ready cards), moved to `In flight`. Spawn one **`worker`** per role-bundle IN PARALLEL — one
+   Task-tool invocation per bundle, batched in a single message — injecting that role's
+   charter, boundaries and conventions, the bundle's card ids in dependency order, the (one,
+   shared) branch name, and the explicit list of files that agent owns. **No worktrees**: every
+   worker this cycle shares that one checkout, kept apart from other agents only by disjoint
+   file ownership.
 
 3. **Verify (parallel, once per increment).** As soon as every card in an increment reports
    done, dispatch ALL of that increment's `verify-roles` in ONE parallel round — one
    **`reviewer`** per verify-role, each reviewing the increment's combined diff
-   (`git diff main...<branch>`), never card-by-card. Never leave a role idle while another
-   increment is being verified: construct the next ready bundle for that role in the same
-   round instead of waiting.
+   (`git diff main...<branch>`), never card-by-card. Each dispatch states that reviewer's
+   **owned files** — its inbox message, plus the specific test files if its charter is
+   `qa-verify` — so two `qa-verify` reviewers never write the same test file. Never leave a
+   role idle while another increment is being verified: construct the next ready bundle for
+   that role in the same round instead of waiting.
 
 4. **Cutover.** When an increment's verify-roles all sign off, the manager pass merges it to
    `main`, moves its cards to `Shipped`, and immediately starts constructing the next ready
@@ -49,10 +52,12 @@ requested number of rounds has run:
    halts everything before the merge; a reported failing test run blocks the merge
    unconditionally and becomes a fix card on the same branch.
 
-   Safety rails: respect the parallelism cap on concurrent increments; never dispatch a card
-   whose `depends-on` are not all `Shipped`; the worker that built an increment is never the
-   reviewer that verifies it; if two ready cards need the same file, the manager bundles them
-   into the same increment instead of splitting them.
+   Safety rails: `parallelism` caps how many agents may be spawned concurrently in one round —
+   it is not a cap on the number of increments (there is exactly one increment branch per
+   cycle; see step 2); never dispatch a card whose `depends-on` are not all `Shipped`; the
+   worker that built an increment is never the reviewer that verifies it; if two ready cards
+   need the same file, the manager bundles them into the same increment instead of splitting
+   them.
 
 5. Next round — the manager pass drains the new inbox messages and the cycle repeats.
 
@@ -60,10 +65,10 @@ requested number of rounds has run:
 
 1. **Init approval** — the initial plan has not been approved yet.
 2. **High/critical security finding** — any `type: escalation` from a `sec-review` role.
-3. **Open human question** — at the end of a round, if any Blocked card carries a
-   `question(HUMAN):` line, stop and present them all together. The card leaves Blocked when
-   the Manager records the human's answer, so an answered question cannot re-trigger this
-   stop.
+3. **Open human question** — at the end of a round, if any card carries an unresolved
+   `question(HUMAN):` line, stop and present them all together. The card stops being blocked
+   when the Manager records the human's answer and clears that line, so an answered question
+   cannot re-trigger this stop.
 4. **Round cap** — `max-rounds-per-sprint` (default 20) reached with work still open.
 5. **Completion** — every card is `Shipped` or `Killed`.
 
@@ -76,7 +81,7 @@ to the Decision Log and the loop continues. In autopilot a sprint/phase gate doe
 it emits a **gate report** and the loop carries on.
 
 Never halt mid-round. A condition discovered mid-round (including a mint-cap breach) becomes
-or stays a Blocked card carrying `question(HUMAN):` and surfaces at the end of that round.
+or stays a card carrying `question(HUMAN):` and surfaces at the end of that round.
 
 ## Gate report (emitted at each sprint/phase gate, and at every hard stop)
 

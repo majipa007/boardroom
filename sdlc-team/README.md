@@ -48,9 +48,9 @@ new one only when nothing covers the need — every such decision is logged, nev
 
 Cards say `role: R-01 backend` and carry mandatory `verify-roles` derived from risk: anything
 touching auth, input parsing, secrets, dependencies or file/network handling gets
-`sec-review`; anything producing executable code gets `qa-verify`. **A card cannot reach Done
-until every verify-role has signed off in `archive/`**, and the worker that implemented a card
-never verifies it.
+`sec-review`; anything producing executable code gets `qa-verify`. **A card cannot reach
+Shipped until every verify-role has signed off in `archive/`**, and the worker that implemented
+a card never verifies it.
 
 ## How it works
 

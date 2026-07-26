@@ -12,7 +12,7 @@ function makeProject(base, name) {
   const sdlc = path.join(dir, '.sdlc');
   fs.mkdirSync(sdlc, { recursive: true });
   fs.writeFileSync(path.join(sdlc, 'kanban.md'),
-    '# Kanban — ' + name + '\n> methodology: agile | phase: Sprint 1\n> last-updated: x | round: 1\n\n## Backlog\n### T-001 | do it\n- assignee: Marcus\n\n## Done\n');
+    '# Kanban — ' + name + '\n> methodology: agile | phase: Sprint 1\n> last-updated: x | round: 1\n\n## Backlog\n### T-001 | do it\n- assignee: Marcus\n- definition-of-done:\n  - [ ] one\n\n## Done\n');
   fs.writeFileSync(path.join(sdlc, 'team.md'),
     '| Name | Role |\n|------|------|\n| Marcus | Backend Developer |\n');
   return dir;
@@ -173,4 +173,32 @@ test('two ticks on one card in the same second do not overwrite each other', () 
   assert.strictEqual(again, a, 'same box + same second reuses the filename');
   assert.strictEqual(fs.readdirSync(path.join(dir, '.sdlc', 'inbox')).length, 2);
   assert.match(fs.readFileSync(a, 'utf8'), /un-ticked/);
+});
+
+test('POST /api/dod refuses a traversing card id and a bad index', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'trav-'));
+  const dir = makeProject(base, 'proj');
+  const reg = path.join(base, 'registry.json');
+  const server = createServer({ root: base, registryPath: reg });
+  await new Promise(res => server.listen(0, '127.0.0.1', res));
+  const port = server.address().port;
+  const post = (body) => fetch(`http://127.0.0.1:${port}/api/dod`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  try {
+    const t = await post({ project: 'proj', card: '../../../../../OUTSIDE/pwned', index: 0, checked: true });
+    assert.strictEqual(t.status, 400, 'a traversing card id must be refused');
+    assert.strictEqual((await post({ project: 'proj', card: 'T-001', index: -1 })).status, 400);
+    assert.strictEqual((await post({ project: 'proj', card: 'T-001', index: 999 })).status, 400);
+    assert.strictEqual((await post({ project: 'proj', card: 'NO-SUCH', index: 0 })).status, 400);
+    // nothing was created anywhere above the project
+    assert.ok(!fs.existsSync(path.join(base, 'OUTSIDE')), 'no file escaped the project tree');
+  } finally { await new Promise(res => server.close(res)); }
+});
+
+test('writeDodCheck itself refuses to escape .sdlc/inbox', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'trav2-'));
+  const dir = makeProject(base, 'proj');
+  assert.throws(() => writeDodCheck({ projectDir: dir, cardId: '../../escape', index: 0, checked: true }));
+  assert.throws(() => writeDodCheck({ projectDir: dir, cardId: 'T-001', index: -1, checked: true }));
 });

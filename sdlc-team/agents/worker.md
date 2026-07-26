@@ -23,6 +23,8 @@ list of files you own. Load the `sdlc-board` skill for the board, card, and inbo
 - Set the message's `from:` to your assigned role exactly as given in the spawn prompt
   (`R-## <name>`) — never your own agent name.
 - Only claim a Definition-of-Done box you have actually verified, and only ever as a request.
+  You may evidence your own tests by pasting the real command output (e.g. the actual test-run
+  output) into your inbox message — a claim alone is not evidence.
 - You do not verify your own work. A separate `reviewer` spawn does that.
 
 ## Git discipline — you share the working directory
@@ -30,7 +32,8 @@ list of files you own. Load the `sdlc-board` skill for the board, card, and inbo
   Never run `git checkout`, `switch`, `reset`, or `stash` — other agents are working in this
   same directory right now and moving HEAD destroys their work.
 - Only `git add` the files you own (your spawn prompt lists them) and commit with a
-  `[<card-id>]` prefix. Never `git add -A`.
+  `[<card-id>]` prefix. Never `git add -A`, and never `git commit -a` / `-am` — either stages
+  every modified tracked file, sweeping another agent's in-progress edits into your commit.
 - If a commit fails on `.git/index.lock`, wait a moment and retry once.
 - Write your inbox message into `.sdlc/inbox/` and commit it on this branch.
 

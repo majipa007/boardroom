@@ -72,7 +72,7 @@ function renderHeader(d) {
   meta.appendChild(bold(`${p.round}/${p.maxRounds}`));
   meta.append(' · ');
   meta.appendChild(bold(String(p.activeWorktrees)));
-  meta.append(' worktrees active');
+  meta.append(' in flight');
   if (p.sprintRunning) {
     meta.append(currentTheme() === 'blueprint'
       ? ` · GOOD SERVICE — ROUND ${p.round}/${p.maxRounds}`
@@ -137,12 +137,14 @@ function renderTeam(d) {
   }
 }
 
-// Boxes the human clicked whose inbox message the Manager has not applied yet.
-const pendingTicks = new Set();          // `${cardId}:${index}`
+// Boxes the human clicked whose inbox message the Manager has not applied yet:
+// `${cardId}:${index}` -> the checked value the human asked for. A box is still
+// pending in EITHER direction (tick or un-tick) until the server data matches it.
+const pendingTicks = new Map();
 
 async function toggleDod(card, index, nextChecked) {
   const key = `${card.id}:${index}`;
-  pendingTicks.add(key);
+  pendingTicks.set(key, nextChecked);
   renderBoard();                          // optimistic: show it immediately as pending
   try {
     const r = await fetch('./api/dod', {
@@ -163,20 +165,21 @@ function dodList(card) {
   const wrap = el('div', 'dodlist');
   card.dodItems.forEach((item, i) => {
     const key = `${card.id}:${i}`;
-    const pending = pendingTicks.has(key);
-    if (item.checked) pendingTicks.delete(key);   // the Manager applied it
+    const intended = pendingTicks.get(key);
+    const pending = intended !== undefined && item.checked !== intended;
+    if (intended !== undefined && item.checked === intended) pendingTicks.delete(key); // the Manager applied it
     const row = el('label', 'dodbox');
-    row.dataset.state = item.checked ? 'checked' : (pending ? 'pending' : 'open');
+    row.dataset.state = pending ? 'pending' : (item.checked ? 'checked' : 'open');
     const box = document.createElement('input');
     box.type = 'checkbox';
-    box.checked = item.checked || pending;
+    box.checked = pending ? intended : item.checked;
     box.addEventListener('click', ev => {
       ev.stopPropagation();                        // don't open the overlay
       toggleDod(card, i, !item.checked);
     });
     row.appendChild(box);
     row.appendChild(el('span', 'dodtext', item.text));
-    if (pending && !item.checked) row.appendChild(el('span', 'dodpending', 'pending'));
+    if (pending) row.appendChild(el('span', 'dodpending', 'pending'));
     wrap.appendChild(row);
   });
   return wrap;
@@ -247,8 +250,8 @@ function renderBoard() {
   }
 }
 
-// Open questions addressed to the human. There is no separate queue file — a
-// question(HUMAN) card sitting in Blocked IS the queue, so this is derived.
+// Open questions addressed to the human. There is no separate queue file, and no
+// Blocked column — any card carrying a question(HUMAN) IS the queue, so this is derived.
 function humanQuestions(d) {
   return (d.cards || []).filter(c => c.questionFor === 'human' && c.question);
 }
@@ -322,7 +325,7 @@ function renderTitleBlock(d) {
   const rows = [
     ['PROJECT', String(p.name || '').toUpperCase()],
     ['ROUND', `${p.round} / ${p.maxRounds}`],
-    ['PARALLEL', `${p.activeWorktrees} WORKTREES`],
+    ['PARALLEL', `${p.activeWorktrees} IN FLIGHT`],
     ['APPROVED BY', d.cards.some(c => c.questionFor === 'human') ? 'PENDING — YOU' : 'AUTO'],
   ];
   for (const [k, v] of rows) {
