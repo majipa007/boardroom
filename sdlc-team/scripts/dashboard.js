@@ -3,8 +3,23 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { discoverProjects } = require('./lib/discover');
-const { computeLastActivity } = require('./lib/parse');
+const { computeLastActivity, parseProject } = require('./lib/parse');
 const { buildPayload } = require('./lib/board-json');
+const { writeDodCheck } = require('./lib/inbox-write');
+
+function readJsonBody(req, limit = 8 * 1024) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', chunk => {
+      data += chunk;
+      if (data.length > limit) reject(new Error('body too large'));
+    });
+    req.on('end', () => {
+      try { resolve(JSON.parse(data)); } catch { reject(new Error('invalid JSON')); }
+    });
+    req.on('error', reject);
+  });
+}
 
 const WEB_DIR = path.join(__dirname, 'web');
 const ASSETS = {
@@ -71,6 +86,34 @@ function createServer({ root = null, registryPath } = {}) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'failed to build the board: ' + e.message }));
       }
+      return;
+    }
+
+    if (pathname === '/api/dod' && req.method === 'POST') {
+      readJsonBody(req).then(body => {
+        const id = String(body.project || '');
+        // The project is chosen from the discovered set by exact basename — a
+        // request can never point the writer at an arbitrary path.
+        const dirs = discoverProjects({ root, registryPath });
+        const dir = dirs.find(d => path.basename(d) === id);
+        if (!dir || !body.card || !Number.isInteger(body.index)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'unknown project, or missing card/index' }));
+          return;
+        }
+        const model = parseProject(dir);
+        const card = Object.values(model.board).flat().find(c => c.id === body.card);
+        const boxText = card && card.dodItems[body.index] ? card.dodItems[body.index].text : '';
+        const file = writeDodCheck({
+          projectDir: dir, cardId: body.card, index: body.index,
+          checked: body.checked !== false, boxText,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, file }));
+      }).catch(e => {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      });
       return;
     }
 

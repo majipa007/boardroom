@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { parseArgs, createServer } = require('../dashboard');
+const { writeDodCheck } = require('../lib/inbox-write');
 
 function makeProject(base, name) {
   const dir = path.join(base, name);
@@ -88,6 +89,68 @@ test('unknown paths 404 and traversal is refused', async () => {
     assert.strictEqual((await fetch(`http://127.0.0.1:${port}/nope`)).status, 404);
     const trav = await fetch(`http://127.0.0.1:${port}/../../etc/passwd`);
     assert.ok(trav.status === 404 || trav.status === 400, 'traversal refused');
+  } finally {
+    await new Promise(res => server.close(res));
+  }
+});
+
+test('writeDodCheck writes one schema-valid inbox message', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dodw-'));
+  const dir = makeProject(base, 'alpha');
+  const file = writeDodCheck({ projectDir: dir, cardId: 'T-001', index: 0, checked: true, boxText: 'compose up works' });
+
+  assert.ok(file.startsWith(path.join(dir, '.sdlc', 'inbox')), 'writes inside .sdlc/inbox only');
+  const body = fs.readFileSync(file, 'utf8');
+  assert.match(body, /^---\n/);
+  assert.match(body, /^from: Human$/m);
+  assert.match(body, /^task: T-001$/m);
+  assert.match(body, /^type: dod-check$/m);
+  assert.match(body, /## Summary/);
+  assert.match(body, /compose up works/);
+  assert.match(body, /## Requested board changes/);
+});
+
+test('POST /api/dod writes a message and never touches the board', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dodw-'));
+  const dir = makeProject(base, 'alpha');
+  const boardBefore = fs.readFileSync(path.join(dir, '.sdlc', 'kanban.md'), 'utf8');
+  const reg = path.join(base, 'registry.json');
+  const server = createServer({ root: base, registryPath: reg });
+  await new Promise(res => server.listen(0, '127.0.0.1', res));
+  const port = server.address().port;
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/dod`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: 'alpha', card: 'T-001', index: 0, checked: true }),
+    });
+    assert.strictEqual(r.status, 200);
+    const out = await r.json();
+    assert.strictEqual(out.ok, true);
+    assert.ok(fs.existsSync(out.file), 'the message file exists');
+
+    assert.strictEqual(fs.readFileSync(path.join(dir, '.sdlc', 'kanban.md'), 'utf8'), boardBefore,
+      'the board is byte-identical — the dashboard never writes it');
+  } finally {
+    await new Promise(res => server.close(res));
+  }
+});
+
+test('POST /api/dod rejects an unknown project and a bad body', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dodw-'));
+  makeProject(base, 'alpha');
+  const reg = path.join(base, 'registry.json');
+  const server = createServer({ root: base, registryPath: reg });
+  await new Promise(res => server.listen(0, '127.0.0.1', res));
+  const port = server.address().port;
+  const post = (body) => fetch(`http://127.0.0.1:${port}/api/dod`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+  });
+  try {
+    assert.strictEqual((await post(JSON.stringify({ project: '../etc', card: 'T-001', index: 0 }))).status, 400);
+    assert.strictEqual((await post('not json')).status, 400);
+    assert.strictEqual((await post(JSON.stringify({ project: 'alpha' }))).status, 400);
+    assert.strictEqual((await fetch(`http://127.0.0.1:${port}/api/dod`)).status, 404, 'GET is not the write path');
   } finally {
     await new Promise(res => server.close(res));
   }
