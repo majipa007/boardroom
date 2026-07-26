@@ -158,7 +158,6 @@ The rules that make it hold together:
 ├── kanban.md           # THE BOARD — manager writes, everyone reads
 ├── team.md             # the role registry + role boundaries
 ├── project-config.md   # methodology, checkpoints, decision log
-├── human-queue.md      # created on demand: questions batched for the next hard stop
 ├── inbox/              # worker → manager messages, awaiting processing
 └── archive/            # processed messages, verbatim (project history)
 ```
@@ -228,8 +227,9 @@ stops. Only these five halt the loop, and only at a round boundary:
 
 1. **Init approval** — the initial plan has not been approved yet.
 2. **High/critical security finding** — any escalation from a security-review role.
-3. **Batched `question(HUMAN)`** — questions raised mid-round are queued in
-   `.sdlc/human-queue.md` and presented together, once, at the end of the round.
+3. **Open `question(HUMAN)`** — questions raised mid-round are not queued to a file; they stay
+   on the board as Blocked `question(HUMAN)` cards and are presented together at the end of
+   the round.
 4. **Round cap** — `max-rounds-per-sprint` (default 20) reached with work still open.
 5. **Completion** — every card is in Done.
 

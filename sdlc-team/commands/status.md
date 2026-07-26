@@ -16,7 +16,9 @@ Otherwise print:
 - **Recent registry changes** — the last 3 mint/extend/edit/retire entries from the Decision
   Log, newest first.
 - Every Blocked card: its id, title, and `question:` line.
-- Anything queued in `.sdlc/human-queue.md` awaiting the next hard stop, or "nothing queued".
+- **Open human questions** — each Blocked card carrying `question(HUMAN):`, with its id and
+  question text, called out distinctly from the general Blocked list above, or "nothing
+  waiting on you".
 - The last 3 archive entries (filename + the one-line `## Summary`).
 
 If `team.md` still uses the legacy roster format (a markdown table rather than `R-##`

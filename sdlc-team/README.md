@@ -64,11 +64,12 @@ never verifies it.
 
 Set `autopilot: on` in `.sdlc/project-config.md` (or run `/sprint --auto`) and the loop keeps
 going, logging its decisions instead of asking. It halts on exactly five things: init
-approval, a high/critical security finding, batched `question(HUMAN)` items, the round cap,
+approval, a high/critical security finding, an open `question(HUMAN)` card, the round cap,
 and completion. Role mints, charter edits, allocation and serialization are auto-decisions
-recorded in the Decision Log. Questions raised mid-round are queued in
-`.sdlc/human-queue.md` and presented together at the next stop — the loop never halts
-mid-round. A failing test run blocks a merge unconditionally, autopilot or not.
+recorded in the Decision Log. Questions raised mid-round are not queued to a file — they stay
+on the board as Blocked `question(HUMAN)` cards and are presented together at the end of the
+round — the loop never halts mid-round. A failing test run blocks a merge unconditionally,
+autopilot or not.
 
 Caps keep it bounded: `parallelism` (3), `max-role-mints-per-sprint` (4) and
 `max-active-roles` (10).
@@ -90,7 +91,6 @@ the page polls it every 5 seconds and repaints only when the content hash change
     ├── kanban.md           # THE BOARD (manager only)
     ├── team.md             # the role registry + role boundaries
     ├── project-config.md   # methodology, checkpoints, decision log
-    ├── human-queue.md      # created on demand: questions batched for the next hard stop
     ├── inbox/              # worker → manager messages
     └── archive/            # processed messages (project history)
 

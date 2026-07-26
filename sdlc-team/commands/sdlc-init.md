@@ -20,9 +20,6 @@ Load the `sdlc-board` skill for all schemas and templates.
    - `.sdlc/team.md` — copied verbatim.
    - `.sdlc/kanban.md` — header filled (project name, methodology, `round: 0`), all columns empty.
    - Create empty `.sdlc/inbox/` and `.sdlc/archive/` directories, each with a `.gitkeep`.
-     (`.sdlc/human-queue.md` is not created here — the manager creates it on demand, the
-     first time it needs to batch a question for the next hard stop, and it is committed with
-     the rest of `.sdlc/`.)
    - Register the project with the dashboard: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/lib/discover.js" --register "$(pwd)"` (appends this project's absolute path to `~/.sdlc-team/projects.json`; idempotent — safe to run again). If Node.js is unavailable, skip this; the dashboard's `--root` scan can still find the project.
 
 4. **Seed the role registry, then decompose the brief.** Invoke the `manager` agent to:

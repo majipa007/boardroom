@@ -48,11 +48,10 @@ requested number of rounds has run:
 
 1. **Init approval** — the initial plan has not been approved yet.
 2. **High/critical security finding** — any `type: escalation` from a `sec-review` role.
-3. **Batched `question(HUMAN)`** — at the end of a round, if `.sdlc/human-queue.md` is
-   non-empty, stop and present every queued item together. The queue is presented once, at
-   this stop; the next manager pass records the human's answers in the Decision Log and
-   deletes the file as its first action, so a resumed run does not immediately re-stop on the
-   same items.
+3. **Open human question** — at the end of a round, if any Blocked card carries a
+   `question(HUMAN):` line, stop and present them all together. The card leaves Blocked when
+   the Manager records the human's answer, so an answered question cannot re-trigger this
+   stop.
 4. **Round cap** — `max-rounds-per-sprint` (default 20) reached with work still open.
 5. **Completion** — every card is in Done.
 
@@ -64,8 +63,8 @@ allocation, serialization, retiring a role, and creating fix cards. The manager 
 to the Decision Log and the loop continues. In autopilot a sprint/phase gate does not halt:
 it emits a **gate report** and the loop carries on.
 
-Never halt mid-round. A condition discovered mid-round (including a mint-cap breach) is
-appended to `.sdlc/human-queue.md` and surfaces at the end of that round.
+Never halt mid-round. A condition discovered mid-round (including a mint-cap breach) becomes
+or stays a Blocked card carrying `question(HUMAN):` and surfaces at the end of that round.
 
 ## Gate report (emitted at each sprint/phase gate, and at every hard stop)
 
@@ -81,7 +80,7 @@ Role health
   R-05 qa-verify    4 cards, 2 rework  ⚠ charter fix applied: <what was changed>
 Any role at rework >= 2 must show the charter/conventions fix that was applied.
 
-Queued for you: <items from .sdlc/human-queue.md, or "none">
+Needs you: <card id + question for each open question(HUMAN) card, or "none">
 ```
 
 In normal (non-autopilot) mode, the gate report is presented and the loop STOPS for your
@@ -89,7 +88,7 @@ approval, as before.
 
 Report a one-line progress note after each round.
 
-> Note on provenance: the enablement flag (`autopilot: on|off` / `--auto`) and the
-> `.sdlc/human-queue.md` file are this implementation's invention, not called out verbatim in
-> the original build spec (`docs/spec.md`) — flagged here so a reader can tell spec from
+> Note on provenance: the enablement mechanism (`autopilot: on|off` in `project-config.md`,
+> plus `/sprint --auto`) is this implementation's invention, not called out verbatim in the
+> original build spec (`docs/spec.md`) — flagged here so a reader can tell spec from
 > invention.

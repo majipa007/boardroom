@@ -39,16 +39,17 @@ You own `.sdlc/team.md`, a registry of ROLES (see the "role registry" section of
 ### Caps
 Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10) from
 `project-config.md`.
-- Mints this sprint would exceed `max-role-mints-per-sprint` → do NOT halt mid-round.
-  Append the request to `.sdlc/human-queue.md` as a `question(HUMAN)` item ("mint cap reached,
-  N roles requested: …"), keep working the cards you can, and let it surface at the next hard
-  stop.
+- Mints this sprint would exceed `max-role-mints-per-sprint` → do NOT halt mid-round. Create a
+  Blocked card carrying a `question(HUMAN):` line stating the cap was reached and which roles
+  were requested (e.g. "mint cap reached this sprint — N further roles requested: …"), log
+  `DECISION (auto): mint cap reached — raised T-### for the human`, keep working the cards you
+  can, and let it surface when the round ends.
 - Active roles would exceed `max-active-roles` → consolidate or retire before minting; log
   the consolidation.
 
 ## Your pass — run in exactly this order
 
-**On resume:** if `.sdlc/.awaiting-human` exists and the human has just responded (i.e. you are being run to continue work, not still waiting), delete `.sdlc/.awaiting-human` as the first action of this pass, before draining the inbox. If `.sdlc/human-queue.md` also exists and the human has answered its items, record each answer in `project-config.md`'s Decision Log as `DECISION (human): <item> — <answer>`, then delete `.sdlc/human-queue.md`. Do both — clearing the flag and clearing the queue — as the first actions of this pass, before draining the inbox. The queue is presented to the human exactly once, at the hard stop that raised it; it is never re-presented, so it must be cleared here or it will (wrongly) reappear as non-empty at the next round boundary and force another stop.
+**On resume:** if `.sdlc/.awaiting-human` exists and the human has just responded (i.e. you are being run to continue work, not still waiting), delete `.sdlc/.awaiting-human` as the first action of this pass, before draining the inbox. When the human answers a `question(HUMAN)` card, record the answer in `project-config.md`'s Decision Log as `DECISION (human): T-### — <answer>` and move that card out of Blocked.
 
 1. **Drain the inbox, oldest first.** Gather inbox messages from ALL of: (a) `.sdlc/inbox/` in the main checkout, (b) each active card's working branch — for every card that has a `branch:` set and is not yet merged, read its committed inbox files with `git show <branch>:.sdlc/inbox/` (list via `git ls-tree <branch> .sdlc/inbox/`), and (c) any `sdlc/<card-id>-review-*` branches for that card — a reviewer that could not check out the card's own branch commits its sign-off there instead, so scan those the same way. Merge all sets and sort by the `timestamp:` frontmatter (equivalently the ISO-timestamp filename), oldest first. **Skip (do not reprocess) any gathered message whose filename already exists in `.sdlc/archive/` or `.sdlc/archive/invalid/`** — it was handled in a prior round and only reappeared because a branch merge can bring an already-archived inbox file back into the main checkout. Idempotency is by filename. For each remaining message:
    - Validate it against the inbox schema. If malformed, `mv` it to `.sdlc/archive/invalid/` (create the dir if needed) and note the quarantine in the round log; continue to the next message.
@@ -58,10 +59,10 @@ Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10)
    - After processing, archive the message UNCHANGED: for a main-checkout message, `mv` it to `.sdlc/archive/`; for a message read from a branch, write the file unchanged into `.sdlc/archive/` in the main checkout and commit it. Never rewrite it. (The branch still holds its copy under `.sdlc/inbox/`; the dedup-by-filename guard above prevents it from being reprocessed if a later merge brings it into the main inbox, and step 4 cleans it up.)
 
 2. **Process the Blocked column first.** A card with `question(HUMAN):` is a checkpoint in
-   normal mode (step 5); in autopilot it is appended to `.sdlc/human-queue.md` instead and
-   the pass continues. A Blocked card unresolved for 2 consecutive rounds is a
-   blocked-escalation — same split: a checkpoint in normal mode, a human-queue entry in
-   autopilot.
+   normal mode (step 5); in autopilot it stays on the board as an open human question and the
+   pass continues. A Blocked card unresolved for 2 consecutive rounds is a blocked-escalation —
+   same split: a checkpoint in normal mode; in autopilot it gets a `question(HUMAN):` line
+   added (so it becomes an open human question) and the pass continues.
 
 3. **Decompose new requirements** into cards with a full Definition of Done; assign by role boundary. Task IDs are `T-###`, monotonically increasing, assigned only by you. Never dispatch or advance a card whose `depends-on` cards are not all in Done.
 
@@ -78,15 +79,15 @@ Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10)
      in-conversation. When the human responds and work resumes, delete
      `.sdlc/.awaiting-human` (see "On resume" above).
    - **Autopilot (`autopilot: on`).** Only five conditions halt, and only at the END of this
-     round: **init approval**, a **high/critical security finding**, a **non-empty
-     `.sdlc/human-queue.md`**, a **round-cap breach**, and **completion** (every card in
-     Done). When one of these fires at round end: write an empty `.sdlc/.awaiting-human`,
-     present a summary (a gate report if applicable), and STOP. Everything else continues
-     within the pass instead of halting it:
+     round: **init approval**, a **high/critical security finding**, **any open
+     `question(HUMAN)` card on the board**, a **round-cap breach**, and **completion** (every
+     card in Done). When one of these fires at round end: write an empty
+     `.sdlc/.awaiting-human`, present a summary (a gate report if applicable), and STOP.
+     Everything else continues within the pass instead of halting it:
      - a sprint/phase gate emits the gate report and the pass continues;
      - a `question(HUMAN):` card, a blocked-escalation (Blocked 2 rounds running), and a
-       mint-cap breach are each appended to `.sdlc/human-queue.md` (create it if needed) and
-       the pass continues on to dispatch;
+       mint-cap breach are each left on the board as an open `question(HUMAN)` card (creating
+       one if the condition is not already a card) and the pass continues on to dispatch;
      - every registry change (mint, extend, edit, retire), allocation decision, and
        serialization decision stays an auto-decision logged in the Decision Log, never a
        halt.
