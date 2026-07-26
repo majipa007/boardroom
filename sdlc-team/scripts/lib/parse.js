@@ -2,7 +2,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const COLUMNS = ['Blocked', 'Backlog', 'In Progress', 'Review', 'Done'];
+const COLUMNS = ['Next', 'In flight', 'Shipped', 'Killed'];
+// Boards created before the RAD rework use these. Both sets are accepted so an
+// existing project keeps loading untouched.
+const LEGACY_COLUMNS = ['Blocked', 'Backlog', 'In Progress', 'Review', 'Done'];
+const ALL_COLUMNS = [...COLUMNS, ...LEGACY_COLUMNS];
 
 function safeMtime(p) {
   try { return fs.statSync(p).mtimeMs; } catch { return 0; }
@@ -50,8 +54,10 @@ function parseConfig(text) {
 // kanban.md -> { header:{methodology,phase,round}, board:{col:[card]} }
 function parseKanban(text) {
   const header = { methodology: '', phase: '', round: 0 };
+  // Seed with the column set this file uses, so callers see the real shape.
+  const isLegacy = /^##\s+(Backlog|In Progress|Done)\s*$/m.test(text);
   const board = {};
-  for (const c of COLUMNS) board[c] = [];
+  for (const c of (isLegacy ? LEGACY_COLUMNS : COLUMNS)) board[c] = [];
   let col = null;
   let card = null;
   let inDod = false;
@@ -64,14 +70,22 @@ function parseKanban(text) {
       header.round = Number(m[1]); continue;
     }
     if ((m = line.match(/^##\s+(.+?)\s*$/))) {
-      col = board[m[1]] ? m[1] : null; card = null; inDod = false; continue;
+      const name = m[1];
+      if (ALL_COLUMNS.includes(name)) {
+        if (!board[name]) board[name] = [];
+        col = name;
+      } else {
+        col = null;
+      }
+      card = null; inDod = false;
+      continue;
     }
     if ((m = line.match(/^###\s+(T-\d+)\s*\|\s*(.+?)\s*$/))) {
       card = col ? {
         id: m[1], title: m[2], assignee: '', priority: '', column: col,
         assigneeName: '', assigneeId: '', branch: '', reviewer: null,
         dependsOn: [], question: '', questionFor: '',
-        dod: { done: 0, total: 0 }, raw: '',
+        dod: { done: 0, total: 0 }, dodItems: [], shipsWhen: '', raw: '',
         roleId: '', roleName: '', verifyRoles: [],
       } : null;
       if (card) board[col].push(card);
@@ -123,10 +137,17 @@ function parseKanban(text) {
       inDod = false;
       continue;
     }
+    if (card && (m = line.match(/^\s*-\s*ships-when:\s*(.+?)\s*$/))) {
+      card.shipsWhen = stripInlineComment(m[1]);
+      inDod = false;
+      continue;
+    }
     if (card && /^\s*-\s*definition-of-done:\s*$/.test(line)) { inDod = true; continue; }
-    if (card && inDod && (m = line.match(/^\s*-\s*\[([ xX])\]/))) {
+    if (card && inDod && (m = line.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/))) {
+      const checked = m[1] !== ' ';
+      card.dodItems.push({ text: m[2].trim(), checked });
       card.dod.total++;
-      if (m[1] !== ' ') card.dod.done++;
+      if (checked) card.dod.done++;
       continue;
     }
     if (card && /^\s*-\s*[a-z-]+:/i.test(line)) { inDod = false; continue; }
@@ -281,6 +302,6 @@ function parseProject(projectDir) {
 }
 
 module.exports = {
-  COLUMNS, parseKanban, parseTeam, parseMessage, listMessages, computeLastActivity, parseProject,
+  COLUMNS, LEGACY_COLUMNS, parseKanban, parseTeam, parseMessage, listMessages, computeLastActivity, parseProject,
   slugify, parseAgentRef, parseConfig, parseRoleRegistry, parseRoleRef,
 };
