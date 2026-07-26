@@ -328,8 +328,9 @@ test('caps and autopilot fall back when the config omits them', () => {
   fs.writeFileSync(path.join(dir, '.sdlc', 'project-config.md'),
     '# Project Config\n- project: Bare\n- methodology: agile\n');
   const b = buildBoardJson(dir);
-  assert.strictEqual(b.project.maxRoleMints, 4);
-  assert.strictEqual(b.project.maxActiveRoles, 10);
+  // startup defaults, matching the shipped project-config template
+  assert.strictEqual(b.project.maxRoleMints, 2);
+  assert.strictEqual(b.project.maxActiveRoles, 4);
   assert.strictEqual(b.project.autopilot, 'off');
 });
 

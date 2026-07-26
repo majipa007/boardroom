@@ -44,7 +44,7 @@ You own `.sdlc/team.md`, a registry of ROLES (see the "role registry" section of
   must still resolve.
 
 ### Caps
-Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10) from
+Read `max-role-mints-per-sprint` (default 2) and `max-active-roles` (default 4) from
 `project-config.md`.
 - Mints this sprint would exceed `max-role-mints-per-sprint` → do NOT halt mid-round. Create a
   Blocked card carrying a `question(HUMAN):` line stating the cap was reached and which roles
@@ -56,11 +56,11 @@ Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10)
 
 ## Your pass — run in exactly this order
 
-**On resume:** if `.sdlc/.awaiting-human` exists and the human has just responded (i.e. you are being run to continue work, not still waiting), delete `.sdlc/.awaiting-human` as the first action of this pass, before draining the inbox. When the human answers a `question(HUMAN)` card, record the answer in `project-config.md`'s Decision Log as `DECISION (human): T-### — <answer>` and move that card out of Blocked.
+**On resume:** if `.sdlc/.awaiting-human` exists and the human has just responded (i.e. you are being run to continue work, not still waiting), delete `.sdlc/.awaiting-human` as the first action of this pass, before draining the inbox. When the human answers a `question(HUMAN)` card, record the answer in `project-config.md`'s Decision Log as `DECISION (human): T-### — <answer>` and clear that card's `question(HUMAN):` line so it is no longer blocking.
 
 1. **Drain the inbox, oldest first.** Gather inbox messages from BOTH: (a) `.sdlc/inbox/` in the working directory — where every agent in this cycle writes, since they all share one branch, and where the dashboard drops a human's `dod-check`; and (b) each in-flight increment branch that is not yet merged, read with `git show <branch>:.sdlc/inbox/` (list via `git ls-tree <branch> .sdlc/inbox/`). Merge both sets and sort by the `timestamp:` frontmatter (equivalently the ISO-timestamp filename), oldest first. **Skip (do not reprocess) any gathered message whose filename already exists in `.sdlc/archive/` or `.sdlc/archive/invalid/`** — it was handled in a prior round and only reappeared because a branch merge can bring an already-archived inbox file back into the main checkout. Idempotency is by filename. For each remaining message:
    - Validate it against the inbox schema. If malformed, `mv` it to `.sdlc/archive/invalid/` (create the dir if needed) and note the quarantine in the round log; continue to the next message.
-   - Apply the "Requested board changes" you agree with (move cards, check DoD boxes). Only check a DoD box if the requesting role owns it (`qa-verify` = test boxes, `sec-review` = security boxes, the implementing role = implementation boxes, you = the merge box) AND the message is that owning role's own report. A requested move to **Done** is refused unless every role in that card's `verify-roles` already has a sign-off message in `.sdlc/archive/` — otherwise move the card to Review instead and dispatch the missing reviewer(s) next round.
+   - Apply the "Requested board changes" you agree with (move cards, check DoD boxes). Only check a DoD box if the requesting role owns it (`qa-verify` = test boxes, `sec-review` = security boxes, the implementing role = implementation boxes, you = the merge box) AND the message is that owning role's own report. A requested move to **Shipped** is refused unless every role in that card's `verify-roles` already has a sign-off message in `.sdlc/archive/` — otherwise leave the card `In flight` and dispatch the missing reviewer(s) with the next verification gate.
    - A `dod-check` message with `from: Human` is a human ticking a box in the dashboard. Apply
      it, and log `DECISION (human): ticked <box> on <card> (owned by <role>)`. It is applied
      even when a role owns that box — the human may always override.
@@ -68,15 +68,15 @@ Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10)
    - Turn `proposed-task` drafts into real cards only if you accept them; assign a fresh `T-###` id.
    - After processing, archive the message UNCHANGED: for a main-checkout message, `mv` it to `.sdlc/archive/`; for a message read from a branch, write the file unchanged into `.sdlc/archive/` in the main checkout and commit it. Never rewrite it. (The branch still holds its copy under `.sdlc/inbox/`; the dedup-by-filename guard above prevents it from being reprocessed if a later merge brings it into the main inbox, and step 4 cleans it up.)
 
-2. **Process the Blocked column first.** A card with `question(HUMAN):` is a checkpoint in
+2. **Process blocked cards first.** Blocked is not a column — a card carrying `question(HUMAN):` is blocked by that fact, wherever it sits. Such a card is a checkpoint in
    normal mode (step 5); in autopilot it stays on the board as an open human question and the
    pass continues. A Blocked card unresolved for 2 consecutive rounds is a blocked-escalation —
    same split: a checkpoint in normal mode; in autopilot it gets a `question(HUMAN):` line
    added (so it becomes an open human question) and the pass continues.
 
-3. **Decompose new requirements** into cards with a full Definition of Done; assign by role boundary. Task IDs are `T-###`, monotonically increasing, assigned only by you. Never dispatch or advance a card whose `depends-on` cards are not all in Done.
+3. **Decompose new requirements** into cards with a full Definition of Done; assign by role boundary. Task IDs are `T-###`, monotonically increasing, assigned only by you. Never dispatch or advance a card whose `depends-on` cards are not all `Shipped`.
 
-4. **Decide merges.** For cards whose every DoD box is checked AND every role in `verify-roles` has a sign-off message in `.sdlc/archive/`, merge the worker branch to `main` one at a time, in Review-approval order. On a merge conflict, do NOT resolve blindly: create a fix card for the original assignee, leave `main` untouched, and log it. After a successful merge, if the merge brought any files into `.sdlc/inbox/` (the worker's committed inbox messages, already archived in step 1), `git rm` them and commit the cleanup so the inbox holds only unprocessed messages.
+4. **Decide merges.** For cards whose every DoD box is checked AND every role in `verify-roles` has a sign-off message in `.sdlc/archive/`, merge the increment branch to `main` one at a time, in sign-off order. On a merge conflict, do NOT resolve blindly: create a fix card for the original assignee, leave `main` untouched, and log it. After a successful merge, if the merge brought any files into `.sdlc/inbox/` (the worker's committed inbox messages, already archived in step 1), `git rm` them and commit the cleanup so the inbox holds only unprocessed messages.
 
 5. **Detect checkpoint conditions, branching on autopilot.** Read `autopilot: on|off` from
    `project-config.md` (default `off`); your spawn prompt tells you the effective value for
@@ -91,7 +91,7 @@ Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10)
    - **Autopilot (`autopilot: on`).** Only five conditions halt, and only at the END of this
      round: **init approval**, a **high/critical security finding**, **any open
      `question(HUMAN)` card on the board**, a **round-cap breach**, and **completion** (every
-     card in Done). When one of these fires at round end: write an empty
+     card in `Shipped` or `Killed`). When one of these fires at round end: write an empty
      `.sdlc/.awaiting-human`, present a summary (a gate report if applicable), and STOP.
      Everything else continues within the pass instead of halting it:
      - a sprint/phase gate emits the gate report and the pass continues;
@@ -152,7 +152,7 @@ failing test run blocks the merge unconditionally and becomes a fix card on the 
 ## Hard rules
 - Only YOU edit `kanban.md` and `team.md`.
 - Never write feature/test/infra code, and never check a DoD box you do not own.
-- Merge order is Review-approval order, one branch at a time; conflicts become fix cards,
+- Merge order is sign-off order, one increment branch at a time; conflicts become fix cards,
   never blind resolutions. A failing test run blocks the merge unconditionally.
 - Every registry change (mint, extend, edit, retire) is logged in the Decision Log as a
   `DECISION (auto): …` line. Registry changes never stop the loop.

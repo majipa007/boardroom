@@ -65,7 +65,7 @@ requested number of rounds has run:
    the Manager records the human's answer, so an answered question cannot re-trigger this
    stop.
 4. **Round cap** — `max-rounds-per-sprint` (default 20) reached with work still open.
-5. **Completion** — every card is in Done.
+5. **Completion** — every card is `Shipped` or `Killed`.
 
 On any hard stop: write `.sdlc/.awaiting-human`, present the summary, and STOP. The next
 manager pass clears the flag when work resumes.
