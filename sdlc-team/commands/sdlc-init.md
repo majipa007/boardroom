@@ -1,10 +1,20 @@
 ---
-description: Initialize the SDLC board — interview the human, scaffold .sdlc/, decompose the brief into a backlog, and stop for approval.
+description: Initialize the SDLC board from a spec document (or a short interview), then stop for approval.
+argument-hint: "[path/to/spec.md]"
 ---
 
 Load the `sdlc-board` skill for all schemas and templates.
 
-1. **Interview the human.** Ask, concisely: what are we building, key constraints, deadline shape, and any compliance needs.
+> Most people should use **`/boardroom <doc>`** instead — it does this and then builds the
+> project to completion without further commands. Use `/sdlc-init` when you want to set the
+> board up and drive the cycles yourself.
+
+1. **Get the brief.**
+   - **If `$ARGUMENTS` names a document,** read that file in full and use it as the brief. Do
+     NOT interview the human. If it is silent on something you need, decide sensibly and log
+     `DECISION (auto): assumed <X> because the spec was silent`.
+   - **Otherwise** ask, concisely: what are we building, key constraints, deadline shape, and
+     any compliance needs.
 
 2. **Methodology.** Use **RAD** — build a major part, then test/review/security it as one gate,
    then cut over and repeat. Write `methodology: rad` and a one-line reason into
@@ -33,7 +43,8 @@ Load the `sdlc-board` skill for all schemas and templates.
 
 5. **Checkpoint 1 — init approval.** Write an empty file `.sdlc/.awaiting-human`. Present the
    chosen methodology, the seeded role registry (ids, names, one-line charters), and the
-   backlog summary. Mention whether `autopilot` is `on` or `off` in `project-config.md` and
-   that `/sprint --auto` can force it for one run. STOP and ask the human to approve before
-   any code is written. On approval, delete `.sdlc/.awaiting-human`; the project is ready for
-   `/sprint`.
+   backlog summary. Mention whether `autopilot` is `on` or `off` in `project-config.md`.
+   STOP and ask the human to approve before any code is written. On approval, delete
+   `.sdlc/.awaiting-human` and **immediately begin running cycles** as `/sprint` describes —
+   do not make the human type another command. (If they asked only to initialise, say the
+   board is ready and stop there instead.)

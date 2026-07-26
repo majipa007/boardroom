@@ -74,22 +74,24 @@ claude plugin validate ./sdlc-team --strict
 
 ## Quickstart
 
-From inside the repository you want built:
+Write down what you want built, then point boardroom at it. From inside the repository:
 
 ```
-/sdlc-init
+/boardroom docs/spec.md
 ```
-Answer a few questions about the project. The manager picks a methodology, composes the role registry, drafts the backlog, and **stops for your approval**.
+
+That's it. It reads your document, plans the work, shows you the plan once, and then **builds
+it to completion** — construct, verify, ship, repeat — without you running another command.
+Add `--go` to skip even the plan approval.
+
+Two optional extras while it runs:
 
 ```
-/sprint
+/sdlc-dashboard     watch the board live in a browser
+/status             where things stand, right now
 ```
-The team works in rounds until the board is clear or something needs you.
 
-```
-/status
-```
-Read-only snapshot, any time.
+Run `/boardroom` with no arguments and it tells you what everything is.
 
 ---
 
@@ -191,10 +193,13 @@ reach Shipped until each has signed off — with the implementer never allowed t
 
 ## Commands
 
+**You normally only need the first one.**
+
 | Command | What it does |
 |---|---|
-| `/sdlc-init` | Interview you, pick a methodology, compose the team, scaffold `.sdlc/`, draft the backlog, stop for approval. |
-| `/sprint [rounds]` | Run the loop: manager pass → parallel dispatch → repeat, until the board is clear or a checkpoint fires. Optional arg caps the rounds. |
+| **`/boardroom <doc> [--go]`** | **The one command.** Reads your spec, plans it, then builds it to completion unattended. With no arguments it explains everything else. |
+| `/sdlc-init [doc]` | Set the board up from a document (or a short interview) and stop — for when you want to drive the cycles yourself. |
+| `/sprint [rounds]` | Run cycles by hand: construct → verify → cutover. Rarely needed; `/boardroom` runs these for you. |
 | `/status` | Read-only board summary: column counts, blocked cards, current phase, recent history. |
 | `/standup` | One line per team member — what they finished, what they're starting. |
 | `/sdlc-override <methodology\|key=value>` | Change methodology or config; the manager restructures the board and logs the decision. |

@@ -75,6 +75,10 @@ or the requested number of rounds has run:
 On any hard stop: write `.sdlc/.awaiting-human`, present the summary, and STOP. The next
 manager pass clears the flag when work resumes.
 
+**When the human answers, resume in the same turn.** Do not ask them to run `/sprint` again —
+take the answer, record it in the Decision Log, and continue the cycles from where you stopped.
+The only time you hand control back for good is completion, or the human telling you to stop.
+
 **Everything else is an auto-decision** — role mints, charter extensions and edits,
 allocation, serialization, retiring a role, and creating fix cards. The manager logs each one
 to the Decision Log and the loop continues. In autopilot a sprint/phase gate does not halt:

@@ -22,9 +22,12 @@ Requires **Node.js ≥ 18** for `/sdlc-dashboard` only; everything else is Markd
 
 ## Commands
 
+**You normally only need the first one.**
+
 | Command | What it does |
 |---------|--------------|
-| `/sdlc-init` | Interview you, pick a methodology, compose the team, scaffold `.sdlc/`, draft the backlog, stop for approval. |
+| **`/boardroom <doc> [--go]`** | **The one command.** Reads your spec document, plans it, then builds it to completion unattended. No arguments = it explains everything else. |
+| `/sdlc-init [doc]` | Interview you, pick a methodology, compose the team, scaffold `.sdlc/`, draft the backlog, stop for approval. |
 | `/sprint [rounds]` | Run the loop: manager pass → parallel worker dispatch → repeat, until the board is clear or a checkpoint fires. Optional arg caps rounds. |
 | `/status` | Read-only board summary. |
 | `/standup` | One line per team member. |
