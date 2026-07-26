@@ -4,7 +4,11 @@
 > the dynamic-roles/autopilot work: the six-persona table, `assignee:`-based cards, per-persona
 > agent files under `.claude/agents/`, and the "Sofia halts the loop" checkpoint flow are all
 > **superseded**. For current behaviour see `docs/dynamic-roles-spec.md` (roles, registry,
-> autopilot) and `docs/dashboard-ui-spec.md` (dashboard UI).
+> autopilot) and `docs/dashboard-ui-spec.md` (dashboard UI). It also predates the RAD rework —
+> per-card worker worktrees, the five-column board (`Blocked/Backlog/In Progress/Review/Done`),
+> and Agile/Kanban/Waterfall/Hybrid methodology selection are all superseded by increments on a
+> shared branch, the `Next/In flight/Shipped/Killed` board, and RAD-by-default with `waterfall`
+> as the sole override. For current behaviour see `docs/rad-boardroom-spec.md`.
 
 > **Purpose of this document:** This is the complete build specification for a Claude Code plugin
 > called `sdlc-team`. Hand this file to Claude Code and build the plugin milestone by milestone
