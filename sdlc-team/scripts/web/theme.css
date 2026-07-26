@@ -266,7 +266,7 @@ body[data-theme="blueprint"] .increments h4{font-family:'Oswald',sans-serif;lett
 body[data-theme="blueprint"] .dodpending{color:var(--warn)}
 body[data-theme="blueprint"] .incbranch{font-family:'Oswald',sans-serif;letter-spacing:.08em}
 body[data-theme="blueprint"] .card[data-status="killed"]{opacity:.55}
-body[data-theme="blueprint"] .card[data-stamp="killed"]::after{color:var(--dim);border-color:var(--dim)}
+body[data-theme="blueprint"] .card[data-stamp="killed"]::after{color:#9DB4E0;border-color:#9DB4E0}
 
 /* ============================================================
    RESPONSIVE

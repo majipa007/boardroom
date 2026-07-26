@@ -40,7 +40,7 @@ function applyTheme(theme) {
   btn.textContent = t === 'blueprint' ? '⇄ SPRINT WALL MODE' : '⇄ BLUEPRINT MODE';
   btn.setAttribute('aria-pressed', String(t === 'blueprint'));
   renderTitle();
-  if (currentData) { renderHeader(currentData); renderNeedsYou(currentData); renderBoard(); }  // flavour text + empty hints differ
+  if (currentData) { renderHeader(currentData); renderNeedsYou(currentData); renderIncrements(currentData); renderBoard(); }  // flavour text + empty hints differ
 }
 
 function renderTitle() {
