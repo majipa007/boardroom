@@ -2,19 +2,17 @@
 
 // data-col value -> demo's column heading text
 const COLS = [
-  ['blocked', 'Blocked'],
-  ['backlog', 'Backlog'],
-  ['progress', 'Doing'],
-  ['review', 'Review'],
-  ['done', 'Done'],
+  ['next', 'Next'],
+  ['flight', 'In flight'],
+  ['shipped', 'Shipped'],
+  ['killed', 'Killed'],
 ];
 
-// status -> [data-stamp, data-stamp-wall, data-stamp-bp]; backlog has none
+// status -> [data-stamp, data-stamp-wall, data-stamp-bp]; Next has none
 const STAMPS = {
-  blocked: ['hold', 'held ✋', 'HOLD'],
-  progress: ['wip', 'on it ✍', 'W.I.P.'],
-  review: ['inspect', 'checking 👀', 'INSPECT'],
-  done: ['merged', 'merged ✓', 'MERGED'],
+  flight: ['wip', 'on it ✍', 'W.I.P.'],
+  shipped: ['merged', 'shipped ✓', 'SHIPPED'],
+  killed: ['killed', 'dropped ✕', 'KILLED'],
 };
 
 const EMPTY_HINT = { wall: 'nothing here', blueprint: 'NO ITEMS — SEC CLEAR' };
@@ -139,6 +137,51 @@ function renderTeam(d) {
   }
 }
 
+// Boxes the human clicked whose inbox message the Manager has not applied yet.
+const pendingTicks = new Set();          // `${cardId}:${index}`
+
+async function toggleDod(card, index, nextChecked) {
+  const key = `${card.id}:${index}`;
+  pendingTicks.add(key);
+  renderBoard();                          // optimistic: show it immediately as pending
+  try {
+    const r = await fetch('./api/dod', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project: selectedProject, card: card.id, index, checked: nextChecked,
+      }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  } catch (e) {
+    pendingTicks.delete(key);             // failed — drop the optimistic state
+    renderBoard();
+  }
+}
+
+function dodList(card) {
+  const wrap = el('div', 'dodlist');
+  card.dodItems.forEach((item, i) => {
+    const key = `${card.id}:${i}`;
+    const pending = pendingTicks.has(key);
+    if (item.checked) pendingTicks.delete(key);   // the Manager applied it
+    const row = el('label', 'dodbox');
+    row.dataset.state = item.checked ? 'checked' : (pending ? 'pending' : 'open');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = item.checked || pending;
+    box.addEventListener('click', ev => {
+      ev.stopPropagation();                        // don't open the overlay
+      toggleDod(card, i, !item.checked);
+    });
+    row.appendChild(box);
+    row.appendChild(el('span', 'dodtext', item.text));
+    if (pending && !item.checked) row.appendChild(el('span', 'dodpending', 'pending'));
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
 function cardNode(c, byId) {
   const a = el('article', 'card');
   a.dataset.status = c.status;
@@ -160,7 +203,9 @@ function cardNode(c, byId) {
   const whoText = c.roleName || c.assigneeName || roleKey || 'unassigned';
   a.appendChild(el('div', 'who', c.reviewerName ? `${whoText} → ${c.reviewerName}` : whoText));
 
-  if (c.dod && c.dod.total > 0) {
+  if (c.shipsWhen) a.appendChild(el('div', 'ships', `ships when: ${c.shipsWhen}`));
+
+  if (c.dodItems && c.dodItems.length) {
     const pct = Math.round((c.dod.done / c.dod.total) * 100);
     const d = el('div', 'dod', `DoD ${c.dod.done}/${c.dod.total}${c.branch ? ' · ' + c.branch : ''}`);
     const bar = el('div', 'bar');
@@ -169,6 +214,7 @@ function cardNode(c, byId) {
     bar.appendChild(i);
     d.appendChild(bar);
     a.appendChild(d);
+    a.appendChild(dodList(c));
   }
 
   if (c.question) a.appendChild(el('p', 'q', c.question));
@@ -231,6 +277,24 @@ function renderNeedsYou(d) {
     row.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open1(); }
     });
+    host.appendChild(row);
+  }
+}
+
+function renderIncrements(d) {
+  const host = document.getElementById('increments');
+  host.textContent = '';
+  const list = d.increments || [];
+  host.hidden = list.length === 0;
+  if (!list.length) return;
+  host.appendChild(el('h4', null,
+    currentTheme() === 'blueprint' ? 'INCREMENTS IN FLIGHT' : 'in flight'));
+  for (const inc of list) {
+    const row = el('div', 'incrow');
+    row.appendChild(el('span', 'incbranch', inc.branch));
+    row.appendChild(el('span', 'inccards', `${inc.cards.length} cards`));
+    row.appendChild(el('span', 'increles', inc.roles.join(', ')));
+    row.appendChild(el('span', 'incdod', `DoD ${inc.dod.done}/${inc.dod.total}`));
     host.appendChild(row);
   }
 }
@@ -330,6 +394,7 @@ async function poll() {
     renderHeader(d);
     renderRail(d);
     renderNeedsYou(d);
+    renderIncrements(d);
     renderTeam(d);
     renderBoard();
     renderFeed(d);
