@@ -13,25 +13,28 @@ Columns, in fixed order. Cards live under a column heading.
 
 ```markdown
 # Kanban — <project name>
-> methodology: <agile|kanban|waterfall|hybrid> | phase: <current phase/sprint>
+> methodology: <rad|waterfall> | phase: <current phase/sprint>
 > last-updated: <ISO timestamp> | round: <n>
 
-## Blocked
-(cards needing manager/human input — processed FIRST every round)
+## Next
+(decided, not started)
 
-## Backlog
+## In flight
+(being built or verified — the branch is the increment)
 
-## In Progress
+## Shipped
 
-## Review
-
-## Done
+## Killed
+(considered and cut — kept for the record)
 ```
 
 **Column rules:**
-- **Blocked** is processed FIRST every round. Any card here MUST contain a `question:` line addressed to the Manager, or `question(HUMAN):` for the human.
-- A card enters **Done** only when every Definition-of-Done checkbox is checked.
+- A card carrying `question(HUMAN):` is **blocked by that fact** — there is no Blocked column, and those cards are surfaced first every cycle.
+- `In flight` covers both building and verifying. The card's `branch:` names the increment it belongs to.
+- A card enters `Shipped` only when its increment's verification signed off and it merged.
+- `Killed` is scope that was decided against. Killing is a logged decision; killed cards are never dispatched.
 - **Only the Manager edits this file.** Everyone else requests changes via the inbox.
+- Legacy boards using `Blocked/Backlog/In Progress/Review/Done` still load; the Manager migrates a card's column when it next touches it.
 
 ## Card schema
 
@@ -47,11 +50,11 @@ Columns, in fixed order. Cards live under a column heading.
 - what: |
     Add POST /auth/refresh. Rotate refresh tokens, invalidate old token,
     return new access+refresh pair. Follow existing error envelope in src/api/errors.ts.
-- definition-of-done:
-  - [ ] Endpoint implemented and returns correct status codes (200/401/403)
-  - [ ] Unit + integration tests written and passing (qa-verify verifies)
-  - [ ] No new high/critical findings (sec-review signs off)
-  - [ ] Branch merges cleanly to main (Manager verifies)
+- ships-when: POST /auth/refresh rotates tokens and the suite is green.
+- definition-of-done:          # keep to 3 boxes or fewer
+  - [ ] endpoint returns 200/401/403
+  - [ ] tests green
+  - [ ] no high/critical findings (review signs off)
 - status-log:
   - 2026-07-24T10:02 created by Manager
 ```
@@ -59,6 +62,34 @@ Columns, in fixed order. Cards live under a column heading.
 **Card rules:**
 - Task IDs are `T-###`, monotonically increasing, assigned only by the Manager.
 - A DoD checkbox may only be checked by the role that owns it: `qa-verify` owns test boxes, `sec-review` owns security boxes, the implementing role owns implementation boxes, the Manager owns the merge box. Ownership is requested via inbox and applied by the Manager.
+
+## Increments — the unit of work
+
+Work ships in **increments**, not cards. An increment is a bundle of ready cards built together
+on **one branch**, `sdlc/inc-##-<slug>`. The branch IS the increment — there is no separate
+field.
+
+- **Bundle dynamically, with no size cap:** every ready card one role can own without a
+  file-footprint conflict with another in-flight bundle. Dependencies inside a bundle are fine —
+  one agent works them in order.
+- Different roles bundle **in parallel on the same branch**, kept apart by file ownership.
+- Verification runs **once per increment**, over the combined diff.
+- If two ready cards genuinely need the same file, they are serialised on that branch rather
+  than split into two increments.
+
+## One branch, one checkout — the rules that keep it safe
+
+There are **no worktrees**. Every agent in a cycle shares the working directory on the
+increment branch. Git allows exactly one HEAD per directory, so this is the only way several
+agents can run at once without separate checkouts.
+
+- **Never run `git checkout`, `git switch`, `git reset`, `git stash`,** or anything else that
+  moves HEAD or rewrites the index wholesale. Doing so destroys every other agent's work in
+  flight.
+- Only ever `git add <the files you own>` and `git commit`. Never `git add -A`.
+- Your spawn prompt names the **files you own**. Editing a file outside that scope is a defect
+  even if your charter would otherwise allow it — another agent may hold it this cycle.
+- If a commit fails on `.git/index.lock`, wait a moment and retry once.
 
 ## Risk classification → mandatory verify-roles
 
@@ -124,15 +155,25 @@ Implemented refresh endpoint on branch sdlc/T-014-jwt-refresh. 14 files changed.
 - `proposed-task` messages contain a full draft card; the Manager decides whether it becomes a real card.
 - After processing, the Manager moves the file **unchanged** to `archive/` (`mv`, not rewrite). `archive/` is a replayable project history and MUST be committed.
 - `type: escalation` messages (e.g. a high/critical security finding) trigger an immediate human checkpoint.
-- **Delivering messages across worktrees.** Both `worker` and `reviewer` run with `isolation: worktree`, so they must **commit** the inbox message onto the working branch — `git add .sdlc/inbox/<file>` then a `[<card-id>]` commit. Untracked files created inside a worktree are invisible to the Manager, so an uncommitted inbox message is never delivered.
+- **Delivering messages on the shared branch.** `worker` and `reviewer` share the working
+  directory on the increment branch (see "One branch, one checkout" above), so they must
+  **commit** the inbox message onto that branch — `git add .sdlc/inbox/<file>` then a
+  `[<card-id>]` commit. An uncommitted inbox message is never delivered.
 
 ## Common protocol for `worker` and `reviewer`
 
-Your spawn prompt gives you a role charter, its boundaries and conventions, and exactly ONE card id. Read `.sdlc/kanban.md` and that card in full, and work only that card. **Never edit `kanban.md` or `team.md`.** Report everything via a new file in `.sdlc/inbox/` following the message schema above, and commit it onto your working branch so the Manager receives it.
+Your spawn prompt gives you a role charter, its boundaries and conventions, the increment
+branch, a bundle of card ids in dependency order, and the explicit list of files you own. Read
+`.sdlc/kanban.md` and those cards in full, and work only within that file list. **Never edit
+`kanban.md` or `team.md`.** Report everything via a new file in `.sdlc/inbox/` following the
+message schema above, and commit it onto the increment branch so the Manager receives it.
 
-Respect your role's boundaries (they come from the registry in `.sdlc/team.md`). If the card needs work outside your scope, do NOT do it — file a `question` or `proposed-task` so the Manager can route it, and note the dependency.
+Respect your role's boundaries (they come from the registry in `.sdlc/team.md`). If the bundle
+needs work outside your scope, do NOT do it — file a `question` or `proposed-task` so the
+Manager can route it, and note the dependency.
 
-Git discipline (workers that write code): work only on branch `sdlc/<task-id>-<slug>` created from `main`; prefix every commit with `[T-###]`; never commit to `main`.
+Git discipline: see "One branch, one checkout" above — you share the working directory with
+other agents this cycle, so never move HEAD, and only `git add` the files you own.
 
 DoD honesty: only ever *request* a DoD box check via inbox, and only for a box you have personally verified.
 

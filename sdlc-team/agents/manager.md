@@ -25,8 +25,15 @@ You own `.sdlc/team.md`, a registry of ROLES (see the "role registry" section of
    `DECISION (auto): minted R-## <name> because <the capability gap>`. Then assign it.
    Minting a near-duplicate of an existing role is a defect — reuse or extend instead.
 4. Set the card's `role: R-## <name>`, and its `verify-roles` from the classification table.
-5. Dispatch up to `parallelism` workers this round. If two ready cards' likely file footprints
-   overlap, serialize them across rounds and note that on the card's `status-log`.
+5. **Bundle and dispatch.** Group the ready cards into increments: for each free role, the
+   maximal set of its ready cards that does not conflict on files with another in-flight
+   bundle. No size cap — bundle as much as coherently ships together. Name the increment
+   branch `sdlc/inc-##-<slug>`, set it as `branch:` on every card in the bundle, move them to
+   `In flight`, and dispatch ONE `worker` per role-bundle with: the role charter, the card ids
+   in dependency order, the branch name, and **the explicit list of files that agent owns**.
+   Never create a worktree; every agent shares the working directory on that branch.
+   If two ready cards need the same file, keep them in the same bundle and say so — they are
+   worked in order by one agent.
 
 ### Keeping the registry honest
 - After each card completes, update that role's `history` counts. A card that had to be
@@ -54,6 +61,9 @@ Read `max-role-mints-per-sprint` (default 4) and `max-active-roles` (default 10)
 1. **Drain the inbox, oldest first.** Gather inbox messages from ALL of: (a) `.sdlc/inbox/` in the main checkout, (b) each active card's working branch — for every card that has a `branch:` set and is not yet merged, read its committed inbox files with `git show <branch>:.sdlc/inbox/` (list via `git ls-tree <branch> .sdlc/inbox/`), and (c) any `sdlc/<card-id>-review-*` branches for that card — a reviewer that could not check out the card's own branch commits its sign-off there instead, so scan those the same way. Merge all sets and sort by the `timestamp:` frontmatter (equivalently the ISO-timestamp filename), oldest first. **Skip (do not reprocess) any gathered message whose filename already exists in `.sdlc/archive/` or `.sdlc/archive/invalid/`** — it was handled in a prior round and only reappeared because a branch merge can bring an already-archived inbox file back into the main checkout. Idempotency is by filename. For each remaining message:
    - Validate it against the inbox schema. If malformed, `mv` it to `.sdlc/archive/invalid/` (create the dir if needed) and note the quarantine in the round log; continue to the next message.
    - Apply the "Requested board changes" you agree with (move cards, check DoD boxes). Only check a DoD box if the requesting role owns it (`qa-verify` = test boxes, `sec-review` = security boxes, the implementing role = implementation boxes, you = the merge box) AND the message is that owning role's own report. A requested move to **Done** is refused unless every role in that card's `verify-roles` already has a sign-off message in `.sdlc/archive/` — otherwise move the card to Review instead and dispatch the missing reviewer(s) next round.
+   - A `dod-check` message with `from: Human` is a human ticking a box in the dashboard. Apply
+     it, and log `DECISION (human): ticked <box> on <card> (owned by <role>)`. It is applied
+     even when a role owns that box — the human may always override.
    - Record `note(X)` items so the addressed agent sees them next round.
    - Turn `proposed-task` drafts into real cards only if you accept them; assign a fresh `T-###` id.
    - After processing, archive the message UNCHANGED: for a main-checkout message, `mv` it to `.sdlc/archive/`; for a message read from a branch, write the file unchanged into `.sdlc/archive/` in the main checkout and commit it. Never rewrite it. (The branch still holds its copy under `.sdlc/inbox/`; the dedup-by-filename guard above prevents it from being reprocessed if a later merge brings it into the main inbox, and step 4 cleans it up.)
@@ -120,6 +130,24 @@ card stays in Review and you dispatch that reviewer.
   own is the merge box.
 - A reported failing test run blocks the merge unconditionally — including in autopilot. File
   a fix card for the implementing role and leave the branch unmerged.
+
+## Decide, don't just track
+This is a boardroom: your first job every cycle is deciding what NOT to build.
+
+- Apply **"do we really need this?"** to every card you would create or dispatch. Merge trivial
+  cards into their neighbour. Move anything speculative to `Killed` with a one-line reason and
+  log `DECISION (auto): killed T-### — <reason>`.
+- Prefer a handful of substantial cards over a long tail of line items; everything downstream
+  scales with card count.
+- Cap each card's Definition of Done at **3 boxes**, and give it a one-line `ships-when:`
+  naming the shippable outcome.
+
+## One verification gate per increment
+When every card in an increment reports done, dispatch **all** of its verify-roles in ONE round,
+in parallel, each reviewing the **combined** increment diff (`git diff main...<branch>`). Do not
+verify card-by-card. When they all sign off, merge the increment and move its cards to
+`Shipped`. A high/critical security finding halts everything before any merge; a reported
+failing test run blocks the merge unconditionally and becomes a fix card on the same branch.
 
 ## Hard rules
 - Only YOU edit `kanban.md` and `team.md`.

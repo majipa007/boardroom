@@ -15,34 +15,46 @@ its decisions, and halts only on a hard stop.
 Repeat until a hard stop fires, the board is all Done, the round cap is reached, or the
 requested number of rounds has run:
 
-**ROUND n:**
+**ROUND n — one RAD cycle: construct → verify → cutover:**
 
 1. **Manager pass (sequential, sole board writer).** Invoke the `manager` agent. Tell it in
    the spawn prompt the effective autopilot state for this run — `on` if `--auto` was passed,
    otherwise whatever `autopilot:` reads in `project-config.md` — so it knows which of its two
-   checkpoint branches to run. It drains the inbox → archive, updates the board, processes
-   Blocked first, checks that every card's `verify-roles` have signed off before allowing
-   Done, merges approved branches (a reported failing test run blocks the merge
-   unconditionally), allocates roles to ready cards (reuse → extend → mint, per its registry
-   rules), and records every auto-decision in the Decision Log.
+   checkpoint branches to run. It drains the inbox → archive, updates the board, surfaces any
+   `question(HUMAN):` card first, checks that every card's `verify-roles` have signed off
+   before allowing `Shipped`, merges approved increments (a reported failing test run blocks
+   the merge unconditionally), bundles ready cards into increments (reuse → extend → mint
+   roles, per its registry rules), moves anything speculative to `Killed`, and records every
+   auto-decision in the Decision Log.
 
-2. **Dispatch (parallel).** From `.sdlc/team.md` and the board, collect the ready work: cards
-   in Backlog/In Progress whose `depends-on` are all Done, and cards in Review awaiting a
-   `verify-roles` sign-off. Spawn up to `parallelism` (default 3) subagents IN PARALLEL — one
-   Task-tool invocation per card, batched in a single message:
-   - implementation cards → the **`worker`** agent
-   - verification cards → the **`reviewer`** agent
-   Each spawn prompt uses the skill's spawn template, injecting that role's charter,
-   boundaries and conventions from the registry, plus exactly one card id.
-   Each subagent works one card in its own worktree, commits its inbox message onto its
-   branch, and terminates.
+2. **Construct (parallel).** From `.sdlc/team.md` and the board, collect the increments the
+   manager just bundled — each a role's maximal conflict-free set of ready cards on one shared
+   branch (`sdlc/inc-##-<slug>`), moved to `In flight`. Spawn one **`worker`** per role-bundle
+   IN PARALLEL — one Task-tool invocation per bundle, batched in a single message — injecting
+   that role's charter, boundaries and conventions, the bundle's card ids in dependency order,
+   the branch name, and the explicit list of files that agent owns. **No worktrees**: every
+   worker on an increment shares that one checkout, kept apart from other agents only by
+   disjoint file ownership.
 
-   Safety rails: one card per subagent per round; respect the parallelism cap; never dispatch
-   a card whose `depends-on` is not Done; the worker that implemented a card is never the
-   agent that verifies it; if two ready cards' file footprints overlap, the manager serializes
-   them across rounds.
+3. **Verify (parallel, once per increment).** As soon as every card in an increment reports
+   done, dispatch ALL of that increment's `verify-roles` in ONE parallel round — one
+   **`reviewer`** per verify-role, each reviewing the increment's combined diff
+   (`git diff main...<branch>`), never card-by-card. Never leave a role idle while another
+   increment is being verified: construct the next ready bundle for that role in the same
+   round instead of waiting.
 
-3. Next round — the manager pass drains the new inbox messages.
+4. **Cutover.** When an increment's verify-roles all sign off, the manager pass merges it to
+   `main`, moves its cards to `Shipped`, and immediately starts constructing the next ready
+   bundle for the freed role — no idling between increments. A high/critical security finding
+   halts everything before the merge; a reported failing test run blocks the merge
+   unconditionally and becomes a fix card on the same branch.
+
+   Safety rails: respect the parallelism cap on concurrent increments; never dispatch a card
+   whose `depends-on` are not all `Shipped`; the worker that built an increment is never the
+   reviewer that verifies it; if two ready cards need the same file, the manager bundles them
+   into the same increment instead of splitting them.
+
+5. Next round — the manager pass drains the new inbox messages and the cycle repeats.
 
 ## Hard stops (autopilot halts on these five, and nothing else)
 
@@ -70,8 +82,9 @@ or stays a Blocked card carrying `question(HUMAN):` and surfaces at the end of t
 
 ```
 GATE REPORT — round <n>, phase <phase>
-Done this gate: <card ids>        Open: <counts by column>
-Merged: <branches>                Blocked: <card ids + why>
+Shipped this gate: <card ids>     Open: Next <n> / In flight <n>
+Merged: <branches>                Blocked (question(HUMAN)): <card ids + why>
+Killed this cycle: <card ids + one-line reason each, or "none">
 Decisions (auto) since last gate: <count> — <one line each>
 
 Role health
