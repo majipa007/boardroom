@@ -435,3 +435,19 @@ test('a legacy board maps onto the RAD statuses', () => {
   assert.deepStrictEqual(b.columns, ['next', 'flight', 'shipped', 'killed']);
   for (const c of b.cards) assert.ok(['next', 'flight', 'shipped', 'killed'].includes(c.status));
 });
+
+test('an assigned-but-not-started card counts toward its increment', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-'));
+  const dir = makeRadProject(base, 'assigned');
+  const board = path.join(dir, '.sdlc', 'kanban.md');
+  // a bundle can be assigned (branch set) while the card is still in Next
+  fs.writeFileSync(board, fs.readFileSync(board, 'utf8').replace(
+    '### T-020 | Not started\n- role: R-01 backend',
+    '### T-020 | Not started\n- role: R-01 backend\n- branch: sdlc/inc-01-core'));
+
+  const b = buildBoardJson(dir);
+  assert.strictEqual(b.cards.find(c => c.id === 'T-020').status, 'next');
+  const inc = b.increments.find(i => i.branch === 'sdlc/inc-01-core');
+  assert.ok(inc.cards.includes('T-020'), 'a next card with a branch joins its increment');
+  assert.deepStrictEqual(inc.cards.sort(), ['T-020', 'T-021', 'T-022']);
+});
