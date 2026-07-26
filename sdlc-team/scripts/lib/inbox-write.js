@@ -18,7 +18,11 @@ function writeDodCheck({ projectDir, cardId, index, checked, boxText, now }) {
 
   const stamp = (now || new Date().toISOString()).replace(/\.\d+Z$/, 'Z');
   const safeStamp = stamp.replace(/:/g, '-');
-  const file = path.join(inbox, `${safeStamp}_HUMAN_${cardId}.md`);
+  // The box index is part of the filename: the timestamp is only second-resolution,
+  // so ticking two boxes on one card within the same second would otherwise collide
+  // and silently drop a request. Re-toggling the SAME box in one second still lands
+  // on one filename, which is correct — last state wins.
+  const file = path.join(inbox, `${safeStamp}_HUMAN_${cardId}-dod${index}.md`);
   const verb = checked ? 'check' : 'uncheck';
   const body = `---
 from: Human

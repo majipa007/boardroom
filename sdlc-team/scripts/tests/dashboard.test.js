@@ -155,3 +155,22 @@ test('POST /api/dod rejects an unknown project and a bad body', async () => {
     await new Promise(res => server.close(res));
   }
 });
+
+test('two ticks on one card in the same second do not overwrite each other', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dodc-'));
+  const dir = makeProject(base, 'alpha');
+  const now = '2026-07-26T10:00:00Z';                 // same timestamp for both
+  const a = writeDodCheck({ projectDir: dir, cardId: 'T-001', index: 0, checked: true, boxText: 'one', now });
+  const b = writeDodCheck({ projectDir: dir, cardId: 'T-001', index: 1, checked: true, boxText: 'two', now });
+
+  assert.notStrictEqual(a, b, 'different boxes must produce different files');
+  assert.strictEqual(fs.readdirSync(path.join(dir, '.sdlc', 'inbox')).length, 2);
+  assert.match(fs.readFileSync(a, 'utf8'), /box 1/);
+  assert.match(fs.readFileSync(b, 'utf8'), /box 2/);
+
+  // re-toggling the SAME box in the same second is last-state-wins, by design
+  const again = writeDodCheck({ projectDir: dir, cardId: 'T-001', index: 0, checked: false, boxText: 'one', now });
+  assert.strictEqual(again, a, 'same box + same second reuses the filename');
+  assert.strictEqual(fs.readdirSync(path.join(dir, '.sdlc', 'inbox')).length, 2);
+  assert.match(fs.readFileSync(a, 'utf8'), /un-ticked/);
+});
