@@ -128,6 +128,7 @@ function renderTeam(d) {
     s.appendChild(el('span', 'face', (m.name || m.id || '?').trim().charAt(0).toUpperCase()));
     s.appendChild(el('b', null, m.name || m.id));
     s.append(' ');
+    if (m.charter) s.title = m.charter;   // full charter on hover, never inline
     const detail = [m.role];
     if (m.busy && m.currentTask) detail.push(m.currentTask);
     if (m.rework >= 2) detail.push(`⚠ ${m.rework} rework`);

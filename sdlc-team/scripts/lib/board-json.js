@@ -55,12 +55,6 @@ function numOr(value, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function firstSentence(text) {
-  const s = String(text || '').trim();
-  const m = s.match(/^(.*?[.!?])(\s|$)/);
-  return (m ? m[1] : s).slice(0, 90);
-}
-
 function hashPayload(payload) {
   return crypto.createHash('sha1')
     .update(JSON.stringify({ ...payload, revision: undefined }))
@@ -125,7 +119,9 @@ function buildBoardJson(projectDir) {
     ? p.roles.map(r => ({
         id: r.id,
         name: r.name,
-        role: firstSentence(r.charter) || r.name,
+        role: r.id,                      // short label for the roster strip
+        // the full charter stays in `charter` for the tooltip/overlay — it is
+        // far too long to render inline next to the name.
         charter: r.charter,
         status: r.status,
         cardsCompleted: r.cardsCompleted,
